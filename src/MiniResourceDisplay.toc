@@ -5,5 +5,6 @@
 ## Version: 1.0.0
 ## SavedVariables: MiniResourceDisplayDB
 ## IconTexture: Interface\AddOns\MiniResourceDisplay\icon.blp
+## X-Curse-Project-ID: 1418734
 
 MiniResourceDisplay.lua

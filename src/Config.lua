@@ -66,7 +66,7 @@ function M:Init()
 
 	local subtitle = panel:CreateFontString(nil, "ARTWORK", "GameFontWhite")
 	subtitle:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -6)
-	subtitle:SetText("Shows simple and configurable health and power bars.")
+	subtitle:SetText("Shows simple personal resource style health and power bars.")
 
 	local alwaysShowChk = mini:Checkbox({
 		Parent = panel,
@@ -140,6 +140,7 @@ function M:Init()
 
 		if msg == "reset" then
 			db = mini:ResetSavedVars(dbDefaults)
+			panel:MiniRefresh()
 			addon:Reload()
 			return
 		elseif msg and msg ~= "" then

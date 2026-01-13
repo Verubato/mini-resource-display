@@ -11,6 +11,8 @@ local dbDefaults = {
 	X = 0,
 	Y = -140,
 
+	Locked = false,
+
 	Scale = 1.0,
 	Width = 150,
 	Height = 15,
@@ -68,6 +70,21 @@ function M:Init()
 	subtitle:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -6)
 	subtitle:SetText("Shows simple personal resource style health and power bars.")
 
+	local locked = mini:Checkbox({
+		Parent = panel,
+		LabelText = "Locked",
+		Tooltip = "Locks the position so it can't be accidentally moved.",
+		GetValue = function()
+			return db.Locked
+		end,
+		SetValue = function(value)
+			db.Locked = value
+			addon:Reload()
+		end,
+	})
+
+	locked:SetPoint("TOPLEFT", subtitle, "BOTTOMLEFT", 0, -verticalSpacing)
+
 	local alwaysShowChk = mini:Checkbox({
 		Parent = panel,
 		LabelText = "Always show",
@@ -81,7 +98,7 @@ function M:Init()
 		end,
 	})
 
-	alwaysShowChk:SetPoint("TOPLEFT", subtitle, "BOTTOMLEFT", 0, -verticalSpacing)
+	alwaysShowChk:SetPoint("LEFT", locked, "RIGHT", columnStep, 0)
 
 	local showText = mini:Checkbox({
 		Parent = panel,
@@ -98,12 +115,14 @@ function M:Init()
 
 	showText:SetPoint("LEFT", alwaysShowChk, "RIGHT", columnStep, 0)
 
+	local sliderWidth = columnStep * 2 - horizontalSpacing / 2
+
 	local widthSlider = mini:Slider({
 		Parent = panel,
 		Min = 100,
 		Max = 400,
 		Step = 10,
-		Width = columnStep * 2,
+		Width = sliderWidth,
 		LabelText = "Width",
 		GetValue = function()
 			return db.Width
@@ -114,14 +133,14 @@ function M:Init()
 		end,
 	})
 
-	widthSlider.Slider:SetPoint("TOPLEFT", alwaysShowChk, "BOTTOMLEFT", 0, -verticalSpacing * 3)
+	widthSlider.Slider:SetPoint("TOPLEFT", locked, "BOTTOMLEFT", 0, -verticalSpacing * 3)
 
 	local heightSlider = mini:Slider({
 		Parent = panel,
 		Min = 15,
 		Max = 50,
 		Step = 5,
-		Width = columnStep * 2,
+		Width = sliderWidth,
 		LabelText = "Height",
 		GetValue = function()
 			return db.Height

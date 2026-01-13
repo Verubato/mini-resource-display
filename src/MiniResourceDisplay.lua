@@ -1,80 +1,24 @@
-local addonName = ...
-local db
-local loader
+local addonName, addon = ...
+---@type MiniFramework
+local mini = addon.Framework
+local eventsFrame
 local container
 local healthBar
 local powerBar
 local healthText
 local powerText
-local dbDefaults = {
-	Point = "CENTER",
-	RelativeTo = "UIParent",
-	RelativePoint = "CENTER",
-	X = 0,
-	Y = -140,
-
-	Scale = 1.0,
-	Width = 150,
-	Height = 15,
-
-	Gap = 0,
-	Padding = 2,
-
-	ShowText = true,
-	Font = "Fonts\\FRIZQT__.TTF",
-	FontSize = 11,
-	FontFlags = "OUTLINE",
-	FontShadow = true,
-
-	Texture = "Interface\\TARGETINGFRAME\\UI-StatusBar",
-	Border = true,
-
-	HealthColor = { 0, 1, 0 },
-	PowerColor = { 0.2, 0.6, 1.0 },
-	PowerUseTypeColor = true,
-
-	AlwaysShow = false,
-
-	FadeInDuration = 1,
-	FadeOutDuration = 1,
-
-	HealthTextFormat = "%s/%s",
-	PowerTextFormat = "%s/%s",
-}
-
-local function Notify(msg)
-	local formatted = string.format("Mini Resource Display - %s.", msg)
-	print(formatted)
-end
-
-local function CopyTable(src, dst)
-	if type(dst) ~= "table" then
-		dst = {}
-	end
-
-	for k, v in pairs(src) do
-		if type(v) == "table" then
-			dst[k] = CopyTable(v, dst[k])
-		elseif dst[k] == nil then
-			dst[k] = v
-		end
-	end
-
-	return dst
-end
+---@type Db
+local db
 
 local function SafeGetRelativeFrame(name)
 	if type(name) ~= "string" or name == "" then
 		return UIParent
 	end
+
 	return _G[name] or UIParent
 end
 
 local function ApplyPosition()
-	if not container or not db then
-		return
-	end
-
 	container:ClearAllPoints()
 	container:SetPoint(
 		db.Point or "CENTER",
@@ -86,10 +30,6 @@ local function ApplyPosition()
 end
 
 local function AddBlackOutline(frame)
-	if not frame then
-		return nil
-	end
-
 	local outline = CreateFrame("Frame", nil, frame, "BackdropTemplate")
 	outline:SetPoint("TOPLEFT", frame, -1, 1)
 	outline:SetPoint("BOTTOMRIGHT", frame, 1, -1)
@@ -108,13 +48,9 @@ local function AddBlackOutline(frame)
 end
 
 local function CreateStatusBar(parent)
-	if not parent then
-		return nil
-	end
-
-	local tex = (db and db.Texture) or "Interface\\TARGETINGFRAME\\UI-StatusBar"
-
+	local tex = db.Texture or "Interface\\TARGETINGFRAME\\UI-StatusBar"
 	local bar = CreateFrame("StatusBar", nil, parent)
+
 	bar:SetStatusBarTexture(tex)
 
 	local sbTex = bar:GetStatusBarTexture()
@@ -164,85 +100,41 @@ local function UpdateSizes()
 	powerBar:SetPoint("TOPRIGHT", healthBar, "BOTTOMRIGHT", 0, -gap)
 	powerBar:SetHeight(h)
 
-	if healthText and powerText then
-		if db.ShowText then
-			healthText:Show()
-			powerText:Show()
-		else
-			healthText:Hide()
-			powerText:Hide()
-		end
-
-		if db.FontShadow then
-			healthText:SetShadowOffset(1, -1)
-			healthText:SetShadowColor(0, 0, 0, 1)
-
-			powerText:SetShadowOffset(1, -1)
-			powerText:SetShadowColor(0, 0, 0, 1)
-		end
-	end
-end
-
-local function FormatWithCommas(value)
-	if not value then
-		return "0"
+	if db.ShowText then
+		healthText:Show()
+		powerText:Show()
+	else
+		healthText:Hide()
+		powerText:Hide()
 	end
 
-	value = math.floor(tonumber(value) or 0)
-	local numString = tostring(value)
-	local result = numString:reverse():gsub("(%d%d%d)", "%1,"):reverse()
+	if db.FontShadow then
+		healthText:SetShadowOffset(1, -1)
+		healthText:SetShadowColor(0, 0, 0, 1)
 
-	if result:sub(1, 1) == "," then
-		result = result:sub(2)
+		powerText:SetShadowOffset(1, -1)
+		powerText:SetShadowColor(0, 0, 0, 1)
 	end
-
-	return result
-end
-
-local function FormatValue(value)
-	if not value then
-		return "0"
-	end
-
-	value = tonumber(value) or 0
-
-	if value > 1000 then
-		local thousands = math.floor(value / 1000)
-		return FormatWithCommas(thousands) .. "K"
-	end
-
-	return tostring(math.floor(value))
 end
 
 local function UpdateHealth()
-	local cur = UnitHealth("player") or 0
+	local hp = UnitHealth("player") or 0
 	local max = UnitHealthMax("player") or 1
 
-	if max <= 0 then
-		max = 1
-	end
+	healthBar:SetMinMaxValues(0, max)
+	healthBar:SetValue(hp)
 
-	local pct = (cur / max) * 100
-
-	if pct < 0 then
-		pct = 0
-	end
-
-	if pct > 100 then
-		pct = 100
-	end
-
-	healthBar:SetMinMaxValues(0, 100)
-	healthBar:SetValue(pct)
-
-	if db.ShowText and healthText then
+	if db.ShowText then
 		local format = db.HealthTextFormat or "%s/%s"
-		healthText:SetText(format:format(FormatValue(cur), FormatValue(max)))
+		local currentHpAbbreviated = AbbreviateNumbers(hp)
+		local maxHpAbbreviated = AbbreviateNumbers(max)
+
+		healthText:SetText(string.format(format, currentHpAbbreviated, maxHpAbbreviated))
 	end
 end
 
 local function GetPowerColor()
-	if db and db.PowerUseTypeColor then
+	if db.PowerUseTypeColor then
 		local pType = UnitPowerType("player")
 		local color = PowerBarColor and PowerBarColor[pType]
 		if color and color.r and color.g and color.b then
@@ -250,7 +142,7 @@ local function GetPowerColor()
 		end
 	end
 
-	if db and db.PowerColor then
+	if db.PowerColor then
 		return db.PowerColor[1] or 1, db.PowerColor[2] or 1, db.PowerColor[3] or 1
 	end
 
@@ -259,33 +151,22 @@ end
 
 local function UpdatePower()
 	local powerType = UnitPowerType("player")
-	local cur = UnitPower("player", powerType) or 0
+	local power = UnitPower("player", powerType) or 0
 	local max = UnitPowerMax("player", powerType) or 1
 
-	if max <= 0 then
-		max = 1
-	end
-
-	local pct = (cur / max) * 100
-
-	if pct < 0 then
-		pct = 0
-	end
-
-	if pct > 100 then
-		pct = 100
-	end
-
-	powerBar:SetMinMaxValues(0, 100)
-	powerBar:SetValue(pct)
+	powerBar:SetMinMaxValues(0, max)
+	powerBar:SetValue(power)
 
 	local r, g, b = GetPowerColor()
 
 	SetBarColor(powerBar, r, g, b)
 
-	if db.ShowText and powerText then
+	if db.ShowText then
 		local format = db.PowerTextFormat or "%s/%s"
-		powerText:SetText(format:format(FormatValue(cur), FormatValue(max)))
+		local currentPowerAbbreviated = AbbreviateNumbers(power)
+		local maxPowerAbbreviated = AbbreviateNumbers(max)
+
+		powerText:SetText(string.format(format, currentPowerAbbreviated, maxPowerAbbreviated))
 	end
 end
 
@@ -340,6 +221,10 @@ end
 local function FadeTo(show)
 	CreateFadeAnimations()
 
+	if container.IsShowing == show then
+		return
+	end
+
 	container.IsShowing = show and true or false
 
 	if show then
@@ -386,22 +271,8 @@ local function UpdateVisibility()
 	FadeTo(UnitAffectingCombat("player"))
 end
 
-local function Reset()
-	PersonalResourceLiteDB = {}
-	db = CopyTable(dbDefaults, PersonalResourceLiteDB)
-
-	ApplyPosition()
-	UpdateSizes()
-	UpdateColors()
-	UpdateVisibility()
-	UpdateHealth()
-	UpdatePower()
-
-	Notify("Reset to defaults.")
-end
-
 local function Load()
-	container = CreateFrame("Frame", "PersonalResourceLiteFrame", UIParent, "BackdropTemplate")
+	container = CreateFrame("Frame", addonName .. "Frame", UIParent, "BackdropTemplate")
 	container:SetClampedToScreen(true)
 	container:EnableMouse(true)
 	container:SetMovable(true)
@@ -425,53 +296,23 @@ local function Load()
 	powerBar = CreateStatusBar(container)
 
 	local baseLevel = container:GetFrameLevel() or 0
-	if healthBar then
-		healthBar:SetFrameLevel(baseLevel + 1)
-	end
-	if powerBar then
-		powerBar:SetFrameLevel(baseLevel + 1)
-	end
+	healthBar:SetFrameLevel(baseLevel + 1)
+	powerBar:SetFrameLevel(baseLevel + 1)
 
 	if db.Border then
-		if healthBar then
-			healthBar.Outline = AddBlackOutline(healthBar)
-		end
-		if powerBar then
-			powerBar.Outline = AddBlackOutline(powerBar)
-		end
+		healthBar.Outline = AddBlackOutline(healthBar)
+		powerBar.Outline = AddBlackOutline(powerBar)
 	end
 
-	if healthBar then
-		healthText = healthBar:CreateFontString(nil, "OVERLAY")
-		healthText:SetFont(db.Font or "Fonts\\FRIZQT__.TTF", db.FontSize or 11, db.FontFlags or "OUTLINE")
-		healthText:SetPoint("CENTER", healthBar, "CENTER", 0, 0)
-	end
+	healthText = healthBar:CreateFontString(nil, "OVERLAY")
+	healthText:SetFont(db.Font or "Fonts\\FRIZQT__.TTF", db.FontSize or 11, db.FontFlags or "OUTLINE")
+	healthText:SetPoint("CENTER", healthBar, "CENTER", 0, 0)
 
-	if powerBar then
-		powerText = powerBar:CreateFontString(nil, "OVERLAY")
-		powerText:SetFont(db.Font or "Fonts\\FRIZQT__.TTF", db.FontSize or 11, db.FontFlags or "OUTLINE")
-		powerText:SetPoint("CENTER", powerBar, "CENTER", 0, 0)
-	end
+	powerText = powerBar:CreateFontString(nil, "OVERLAY")
+	powerText:SetFont(db.Font or "Fonts\\FRIZQT__.TTF", db.FontSize or 11, db.FontFlags or "OUTLINE")
+	powerText:SetPoint("CENTER", powerBar, "CENTER", 0, 0)
 
-	ApplyPosition()
-	UpdateSizes()
-	UpdateColors()
-	UpdateVisibility()
-	UpdateHealth()
-	UpdatePower()
-
-	SLASH_MINIRESOURCEDISPLAY1 = "/prl"
-	SlashCmdList.MINIRESOURCEDISPLAY = function(msg)
-		msg = (msg or ""):lower():match("^%s*(.-)%s*$")
-
-		if msg == "reset" then
-			Reset()
-			return
-		end
-
-		Notify("Commands:")
-		Notify("/mrd reset")
-	end
+	addon:Reload()
 end
 
 local function OnEvent(_, event, arg1)
@@ -502,29 +343,38 @@ local function OnEvent(_, event, arg1)
 	end
 end
 
-loader = CreateFrame("Frame")
-loader:RegisterEvent("ADDON_LOADED")
-loader:SetScript("OnEvent", function(_, event, arg1)
-	if event == "ADDON_LOADED" and arg1 == addonName then
-		MiniResourceDisplayDB = MiniResourceDisplayDB or {}
-		db = CopyTable(dbDefaults, MiniResourceDisplayDB)
+local function OnAddonLoaded()
+	addon.Config:Init()
 
-		Load()
+	db = mini:GetSavedVars()
 
-		loader:RegisterEvent("PLAYER_ENTERING_WORLD")
-		loader:RegisterEvent("PLAYER_REGEN_DISABLED")
-		loader:RegisterEvent("PLAYER_REGEN_ENABLED")
+	Load()
 
-		if loader.RegisterUnitEvent then
-			loader:RegisterUnitEvent("UNIT_HEALTH", "player")
-			loader:RegisterUnitEvent("UNIT_POWER_UPDATE", "player")
-			loader:RegisterUnitEvent("UNIT_POWER_FREQUENT", "player")
-		else
-			loader:RegisterEvent("UNIT_HEALTH")
-			loader:RegisterEvent("UNIT_POWER_UPDATE")
-			loader:RegisterEvent("UNIT_POWER_FREQUENT")
-		end
+	eventsFrame = CreateFrame("Frame")
+	eventsFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
+	eventsFrame:RegisterEvent("PLAYER_REGEN_DISABLED")
+	eventsFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
 
-		loader:SetScript("OnEvent", OnEvent)
+	if eventsFrame.RegisterUnitEvent then
+		eventsFrame:RegisterUnitEvent("UNIT_HEALTH", "player")
+		eventsFrame:RegisterUnitEvent("UNIT_POWER_UPDATE", "player")
+		eventsFrame:RegisterUnitEvent("UNIT_POWER_FREQUENT", "player")
+	else
+		eventsFrame:RegisterEvent("UNIT_HEALTH")
+		eventsFrame:RegisterEvent("UNIT_POWER_UPDATE")
+		eventsFrame:RegisterEvent("UNIT_POWER_FREQUENT")
 	end
-end)
+
+	eventsFrame:SetScript("OnEvent", OnEvent)
+end
+
+function addon:Reload()
+	ApplyPosition()
+	UpdateSizes()
+	UpdateColors()
+	UpdateVisibility()
+	UpdateHealth()
+	UpdatePower()
+end
+
+mini:WaitForAddonLoad(OnAddonLoaded)

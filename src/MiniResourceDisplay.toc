@@ -7,4 +7,6 @@
 ## IconTexture: Interface\AddOns\MiniResourceDisplay\icon.blp
 ## X-Curse-Project-ID: 1418734
 
+MiniFramework.lua
+Config.lua
 MiniResourceDisplay.lua

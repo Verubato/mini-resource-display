@@ -27,6 +27,8 @@ local function ApplyPosition()
 		db.X or 0,
 		db.Y or 0
 	)
+	container:EnableMouse(not db.Locked)
+	container:SetMovable(not db.Locked)
 end
 
 local function AddBlackOutline(frame)
@@ -274,8 +276,8 @@ end
 local function Load()
 	container = CreateFrame("Frame", addonName .. "Frame", UIParent, "BackdropTemplate")
 	container:SetClampedToScreen(true)
-	container:EnableMouse(true)
-	container:SetMovable(true)
+	container:EnableMouse(not db.Locked)
+	container:SetMovable(not db.Locked)
 	container:RegisterForDrag("LeftButton")
 	container:SetScript("OnDragStart", container.StartMoving)
 	container:SetScript("OnDragStop", function(self)

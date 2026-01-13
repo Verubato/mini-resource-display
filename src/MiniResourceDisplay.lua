@@ -335,7 +335,7 @@ local function OnEvent(_, event, arg1)
 		return
 	end
 
-	if event == "UNIT_POWER_UPDATE" or event == "UNIT_POWER_FREQUENT" then
+	if event == "UNIT_POWER_UPDATE" or event == "UNIT_POWER_FREQUENT" or event == "UNIT_DISPLAYPOWER" then
 		if arg1 == "player" then
 			UpdatePower()
 		end
@@ -359,10 +359,12 @@ local function OnAddonLoaded()
 		eventsFrame:RegisterUnitEvent("UNIT_HEALTH", "player")
 		eventsFrame:RegisterUnitEvent("UNIT_POWER_UPDATE", "player")
 		eventsFrame:RegisterUnitEvent("UNIT_POWER_FREQUENT", "player")
+		eventsFrame:RegisterUnitEvent("UNIT_DISPLAYPOWER", "player")
 	else
 		eventsFrame:RegisterEvent("UNIT_HEALTH")
 		eventsFrame:RegisterEvent("UNIT_POWER_UPDATE")
 		eventsFrame:RegisterEvent("UNIT_POWER_FREQUENT")
+		eventsFrame:RegisterEvent("UNIT_DISPLAYPOWER")
 	end
 
 	eventsFrame:SetScript("OnEvent", OnEvent)

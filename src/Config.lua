@@ -137,16 +137,16 @@ function M:Init()
 
 	local heightSlider = mini:Slider({
 		Parent = panel,
-		Min = 15,
+		Min = 10,
 		Max = 50,
-		Step = 5,
+		Step = 1,
 		Width = sliderWidth,
 		LabelText = "Height",
 		GetValue = function()
 			return db.Height
 		end,
 		SetValue = function(value)
-			db.Height = mini:ClampInt(value, 15, 50, 15)
+			db.Height = mini:ClampInt(value, 10, 50, 15)
 			addon:Reload()
 		end,
 	})

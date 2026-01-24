@@ -1,12 +1,14 @@
 local addonName, addon = ...
 ---@type MiniFramework
 local mini = addon.Framework
+local LSM = LibStub and LibStub("LibSharedMedia-3.0", false)
 local eventsFrame
 local container
 local healthBar
 local powerBar
 local healthText
 local powerText
+local fallbackTexture = "Interface\\TARGETINGFRAME\\UI-StatusBar"
 ---@type Db
 local db
 
@@ -16,6 +18,20 @@ local function SafeGetRelativeFrame(name)
 	end
 
 	return _G[name] or UIParent
+end
+
+local function GetConfiguredTexture()
+	if db.Texture == "Blizzard" then
+		return fallbackTexture
+	end
+
+	local texture
+
+	if LSM then
+		texture = LSM:Fetch("statusbar", db.Texture)
+	end
+
+	return texture or fallbackTexture
 end
 
 local function ApplyPosition()
@@ -50,12 +66,18 @@ local function AddBlackOutline(frame)
 end
 
 local function CreateStatusBar(parent)
-	local tex = db.Texture or "Interface\\TARGETINGFRAME\\UI-StatusBar"
+	local texture = GetConfiguredTexture()
 	local bar = CreateFrame("StatusBar", nil, parent)
 
-	bar:SetStatusBarTexture(tex)
+	bar:SetStatusBarTexture(texture)
 
 	local sbTex = bar:GetStatusBarTexture()
+
+	if not sbTex then
+		bar:SetStatusBarTexture(fallbackTexture)
+		sbTex = bar:GetStatusBarTexture()
+	end
+
 	if sbTex then
 		sbTex:SetHorizTile(false)
 		sbTex:SetVertTile(false)
@@ -182,6 +204,20 @@ local function UpdateColors()
 	local r, g, b = GetPowerColor()
 
 	SetBarColor(powerBar, r, g, b)
+end
+
+local function UpdateTextures()
+	local texture = GetConfiguredTexture()
+
+	healthBar:SetStatusBarTexture(texture)
+	powerBar:SetStatusBarTexture(texture)
+
+	local didTextureLoad = healthBar:GetStatusBarTexture()
+
+	if didTextureLoad == nil then
+		healthBar:SetStatusBarTexture(fallbackTexture)
+		powerBar:SetStatusBarTexture(fallbackTexture)
+	end
 end
 
 local function CreateFadeAnimations()
@@ -379,6 +415,7 @@ function addon:Reload()
 	UpdateVisibility()
 	UpdateHealth()
 	UpdatePower()
+	UpdateTextures()
 end
 
 mini:WaitForAddonLoad(OnAddonLoaded)

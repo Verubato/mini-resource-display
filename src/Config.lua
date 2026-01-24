@@ -1,4 +1,5 @@
 local addonName, addon = ...
+local LSM = LibStub and LibStub("LibSharedMedia-3.0", false)
 ---@type MiniFramework
 local mini = addon.Framework
 ---@type Db
@@ -41,10 +42,19 @@ local dbDefaults = {
 	HealthTextFormat = "%s/%s",
 	PowerTextFormat = "%s/%s",
 }
-
 local M = {}
 
 addon.Config = M
+
+local function GetTexturesList()
+	if not LSM then
+		return { "Blizzard" }
+	end
+
+	local list = LSM:List("statusbar")
+	table.sort(list)
+	return list
+end
 
 function M:Init()
 	db = mini:GetSavedVars(dbDefaults)
@@ -70,6 +80,15 @@ function M:Init()
 	subtitle:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -6)
 	subtitle:SetText("Shows simple personal resource style health and power bars.")
 
+	local mainDivider = mini:Divider({
+		Parent = panel,
+		Text = "Settings",
+	})
+
+	mainDivider:SetPoint("TOP", subtitle, "BOTTOM", 0, -verticalSpacing)
+	mainDivider:SetPoint("LEFT", panel, "LEFT")
+	mainDivider:SetPoint("RIGHT", panel, "RIGHT", -horizontalSpacing, 0)
+
 	local locked = mini:Checkbox({
 		Parent = panel,
 		LabelText = "Locked",
@@ -83,7 +102,7 @@ function M:Init()
 		end,
 	})
 
-	locked:SetPoint("TOPLEFT", subtitle, "BOTTOMLEFT", 0, -verticalSpacing)
+	locked:SetPoint("TOPLEFT", mainDivider, "BOTTOMLEFT", 0, -verticalSpacing)
 
 	local alwaysShowChk = mini:Checkbox({
 		Parent = panel,
@@ -115,6 +134,15 @@ function M:Init()
 
 	showText:SetPoint("LEFT", alwaysShowChk, "RIGHT", columnStep, 0)
 
+	local sizeDivider = mini:Divider({
+		Parent = panel,
+		Text = "Size",
+	})
+
+	sizeDivider:SetPoint("TOP", locked, "BOTTOM", 0, -verticalSpacing)
+	sizeDivider:SetPoint("LEFT", panel, "LEFT")
+	sizeDivider:SetPoint("RIGHT", panel, "RIGHT", -horizontalSpacing, 0)
+
 	local sliderWidth = columnStep * 2 - horizontalSpacing / 2
 
 	local widthSlider = mini:Slider({
@@ -133,7 +161,7 @@ function M:Init()
 		end,
 	})
 
-	widthSlider.Slider:SetPoint("TOPLEFT", locked, "BOTTOMLEFT", 0, -verticalSpacing * 3)
+	widthSlider.Slider:SetPoint("TOPLEFT", sizeDivider, "BOTTOMLEFT", 0, -verticalSpacing * 3)
 
 	local heightSlider = mini:Slider({
 		Parent = panel,
@@ -170,6 +198,36 @@ function M:Init()
 	})
 
 	scaleSlider.Slider:SetPoint("TOPLEFT", widthSlider.Slider, "BOTTOMLEFT", 0, -verticalSpacing * 3)
+
+	local textureDdl = mini:Dropdown({
+		Parent = panel,
+		Width = columnStep * 2,
+		LabelText = "Texture",
+		Items = GetTexturesList(),
+		GetValue = function()
+			return db.Texture
+		end,
+		SetValue = function(value)
+			db.Texture = value
+			addon:Reload()
+		end,
+	})
+
+	local textureDivider = mini:Divider({
+		Parent = panel,
+		Text = "Look & Feel",
+	})
+
+	textureDivider:SetPoint("TOP", scaleSlider.Slider, "BOTTOM", 0, -verticalSpacing)
+	textureDivider:SetPoint("LEFT", panel, "LEFT")
+	textureDivider:SetPoint("RIGHT", panel, "RIGHT", -horizontalSpacing, 0)
+
+	textureDdl.Label:SetPoint("TOPLEFT", textureDivider, "BOTTOMLEFT", 0, -verticalSpacing * 2)
+
+	panel:HookScript("OnShow", function()
+		-- refresh the items
+		textureDdl.Dropdown:MiniRefresh()
+	end)
 
 	SLASH_MINIRESOURCEDISPLAY1 = "/mrd"
 	SlashCmdList.MINIRESOURCEDISPLAY = function(msg)

@@ -199,6 +199,24 @@ function M:Init()
 
 	scaleSlider.Slider:SetPoint("TOPLEFT", widthSlider.Slider, "BOTTOMLEFT", 0, -verticalSpacing * 3)
 
+	local textSizeSlider = mini:Slider({
+		Parent = panel,
+		Min = 8,
+		Max = 20,
+		Step = 1,
+		Width = sliderWidth,
+		LabelText = "Text Size",
+		GetValue = function()
+			return db.FontSize
+		end,
+		SetValue = function(value)
+			db.FontSize = mini:ClampInt(value, 8, 20, dbDefaults.FontSize)
+			addon:Reload()
+		end,
+	})
+
+	textSizeSlider.Slider:SetPoint("LEFT", scaleSlider.Slider, "RIGHT", horizontalSpacing, 0)
+
 	local textureDdl = mini:Dropdown({
 		Parent = panel,
 		Width = columnStep * 2,

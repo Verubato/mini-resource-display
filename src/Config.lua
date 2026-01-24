@@ -128,7 +128,7 @@ function M:Init()
 			return db.Width
 		end,
 		SetValue = function(value)
-			db.Width = mini:ClampInt(value, 100, 400, 150)
+			db.Width = mini:ClampInt(value, 100, 400, dbDefaults.Width)
 			addon:Reload()
 		end,
 	})
@@ -146,12 +146,30 @@ function M:Init()
 			return db.Height
 		end,
 		SetValue = function(value)
-			db.Height = mini:ClampInt(value, 10, 50, 15)
+			db.Height = mini:ClampInt(value, 10, 50, dbDefaults.Height)
 			addon:Reload()
 		end,
 	})
 
 	heightSlider.Slider:SetPoint("LEFT", widthSlider.Slider, "RIGHT", horizontalSpacing, 0)
+
+	local scaleSlider = mini:Slider({
+		Parent = panel,
+		Min = 0.5,
+		Max = 2,
+		Step = 0.1,
+		Width = sliderWidth,
+		LabelText = "Scale",
+		GetValue = function()
+			return db.Scale
+		end,
+		SetValue = function(value)
+			db.Scale = mini:ClampFloat(value, 0.5, 2, dbDefaults.Scale)
+			addon:Reload()
+		end,
+	})
+
+	scaleSlider.Slider:SetPoint("TOPLEFT", widthSlider.Slider, "BOTTOMLEFT", 0, -verticalSpacing * 3)
 
 	SLASH_MINIRESOURCEDISPLAY1 = "/mrd"
 	SlashCmdList.MINIRESOURCEDISPLAY = function(msg)

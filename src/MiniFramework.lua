@@ -14,6 +14,16 @@ local M = {
 }
 addon.Framework = M
 
+local function NilKeys(target)
+	for k, v in pairs(target) do
+		if type(v) == "table" then
+			NilKeys(v)
+		else
+			target[k] = nil
+		end
+	end
+end
+
 local function AddControlForRefresh(panel, control)
 	-- store controls for refresh behaviour
 	panel.MiniControls = panel.MiniControls or {}
@@ -118,6 +128,14 @@ function M:NotifyCombatLockdown()
 	M:Notify("Can't do that during combat.")
 end
 
+function M:IsSecret(value)
+	if not issecretvalue then
+		return false
+	end
+
+	return issecretvalue(value)
+end
+
 function M:CopyTable(src, dst)
 	if type(dst) ~= "table" then
 		dst = {}
@@ -142,6 +160,24 @@ function M:ClampInt(v, minV, maxV, fallback)
 	end
 
 	v = math.floor(v + 0.5)
+
+	if v < minV then
+		return minV
+	end
+
+	if v > maxV then
+		return maxV
+	end
+
+	return v
+end
+
+function M:ClampFloat(v, minV, maxV, fallback)
+	v = tonumber(v)
+
+	if not v then
+		return fallback
+	end
 
 	if v < minV then
 		return minV
@@ -360,25 +396,41 @@ function M:EditBox(options)
 		error("EditBox - options must not be nil.")
 	end
 
-	if not options.Parent or not options.GetValue or not options.SetValue then
+	if not options.Parent or not options.GetValue then
 		error("EditBox - invalid options.")
 	end
 
 	local label = options.Parent:CreateFontString(nil, "ARTWORK", "GameFontNormal")
 	label:SetText(options.LabelText or "")
 
-	local box = CreateFrame("EditBox", nil, options.Parent, "InputBoxTemplate")
+	local box = CreateFrame("EditBox", nil, options.Parent)
+	box:SetMultiLine(options.MultiLine or false)
 	box:SetSize(options.Width or 80, options.Height or 20)
 	box:SetAutoFocus(false)
+	box:SetFontObject("GameFontWhite")
+
+	local padding = 10
+	box:SetTextInsets(padding, padding, padding, padding)
+
+	local bg = CreateFrame("Frame", nil, options.Parent, "BackdropTemplate")
+	bg:SetBackdrop({
+		edgeFile = "Interface\\Glues\\Common\\TextPanel-Border",
+		edgeSize = 16,
+	})
+	bg:SetAllPoints(box)
 
 	if options.Numeric then
 		ConfigureNumbericBox(box, options.AllowNegatives)
 	end
 
+	local readonly = options.Readonly == true
+
 	local function Commit()
 		local new = box:GetText()
 
-		options.SetValue(new)
+		if options.SetValue then
+			options.SetValue(new)
+		end
 
 		local value = options.GetValue() or ""
 
@@ -386,12 +438,25 @@ function M:EditBox(options)
 		box:SetCursorPosition(0)
 	end
 
+	if readonly then
+		box:SetScript("OnTextChanged", function(_, userInput)
+			if not userInput then
+				return
+			end
+
+			box:SetText(options.GetValue() or "")
+		end)
+	else
+		box:SetScript("OnEditFocusLost", Commit)
+	end
+
 	box:SetScript("OnEnterPressed", function(boxSelf)
 		boxSelf:ClearFocus()
-		Commit()
-	end)
 
-	box:SetScript("OnEditFocusLost", Commit)
+		if not readonly then
+			Commit()
+		end
+	end)
 
 	function box.MiniRefresh(boxSelf)
 		local value = options.GetValue()
@@ -625,14 +690,18 @@ function M:Slider(options)
 		high:SetText(options.Max)
 	end
 
+	local hasFloat = math.floor(options.Step) ~= options.Step
 	local box = CreateFrame("EditBox", nil, options.Parent, "InputBoxTemplate")
-	ConfigureNumbericBox(box, options.Min < 0)
+
+	if not hasFloat then
+		ConfigureNumbericBox(box, options.Min < 0)
+	end
 
 	box:SetPoint("CENTER", slider, "CENTER", 0, 30)
 	box:SetFontObject("GameFontWhite")
 	box:SetSize(50, 20)
 	box:SetAutoFocus(false)
-	box:SetMaxLetters(math.log(options.Max, 10) + 1)
+	box:SetMaxLetters(math.log(options.Max, 10) + 1 + (hasFloat and 2 or 0))
 	box:SetText(tostring(options.GetValue()))
 	box:SetJustifyH("CENTER")
 	box:SetCursorPosition(0)
@@ -713,7 +782,7 @@ function M:HideDialog()
 	end
 end
 
-function M:RegisterSlashCommand(category, panel)
+function M:RegisterSlashCommand(category, panel, commands)
 	if not category then
 		error("RegisterSlashCommand - category must not be nil.")
 	end
@@ -725,6 +794,14 @@ function M:RegisterSlashCommand(category, panel)
 
 	SlashCmdList[upper] = function()
 		M:OpenSettings(category, panel)
+	end
+
+	if commands and #commands > 0 then
+		local addonUpper = string.upper(addonName)
+
+		for i, command in ipairs(commands) do
+			_G["SLASH_" .. addonUpper .. i] = command
+		end
 	end
 end
 
@@ -782,15 +859,43 @@ function M:ResetSavedVars(defaults)
 
 	-- don't create a new table because we're referencing that in the addon
 	-- instead clear the existing keys and return the same instance (if one existed to begin with)
-	for k in pairs(vars) do
-		vars[k] = nil
-	end
+	NilKeys(vars)
 
 	if defaults then
 		return M:CopyTable(defaults, vars)
 	end
 
 	return vars
+end
+
+---Removes any erronous values from the options table.
+---@param target table the target table to clean
+---@param template table what the table should look like
+---@param cleanValues any whether or not to clean non-table values, e.g. numbers and strings
+---@param recurse any whether to recursively clean the table
+function M:CleanTable(target, template, cleanValues, recurse)
+	-- remove values that aren't ours
+	if type(target) ~= "table" or type(template) ~= "table" then
+		return
+	end
+
+	for key, value in pairs(target) do
+		local templateValue = template[key]
+
+		-- only clean non-table values if told to do so
+		if cleanValues and templateValue == nil then
+			target[key] = nil
+		end
+
+		if recurse then
+			if type(value) == "table" and type(templateValue) == "table" then
+				M:CleanTable(value, templateValue, cleanValues, recurse)
+			elseif type(value) == "table" and type(templateValue) ~= "table" then
+				-- type mismatch: reset this key to default
+				target[key] = templateValue
+			end
+		end
+	end
 end
 
 function M:ColumnWidth(columns, padding, spacingColumns)
@@ -831,10 +936,12 @@ loader:SetScript("OnEvent", OnAddonLoaded)
 ---@field Tooltip string?
 ---@field Numeric boolean?
 ---@field AllowNegatives boolean?
+---@field MultiLine boolean?
 ---@field Width number?
 ---@field Height number?
+---@field Readonly boolean?
 ---@field GetValue fun(): string|number
----@field SetValue fun(value: string|number)
+---@field SetValue? fun(value: string|number)
 
 ---@class EditBoxReturn
 ---@field EditBox table

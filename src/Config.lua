@@ -14,7 +14,6 @@ local dbDefaults = {
 
 	Locked = false,
 
-	Scale = 1.0,
 	Width = 150,
 	Height = 15,
 
@@ -165,7 +164,7 @@ function M:Init()
 
 	local heightSlider = mini:Slider({
 		Parent = panel,
-		Min = 10,
+		Min = 8,
 		Max = 50,
 		Step = 1,
 		Width = sliderWidth,
@@ -174,30 +173,12 @@ function M:Init()
 			return db.Height
 		end,
 		SetValue = function(value)
-			db.Height = mini:ClampInt(value, 10, 50, dbDefaults.Height)
+			db.Height = mini:ClampInt(value, 8, 50, dbDefaults.Height)
 			addon:Reload()
 		end,
 	})
 
 	heightSlider.Slider:SetPoint("LEFT", widthSlider.Slider, "RIGHT", horizontalSpacing, 0)
-
-	local scaleSlider = mini:Slider({
-		Parent = panel,
-		Min = 0.5,
-		Max = 2,
-		Step = 0.1,
-		Width = sliderWidth,
-		LabelText = "Scale",
-		GetValue = function()
-			return db.Scale
-		end,
-		SetValue = function(value)
-			db.Scale = mini:ClampFloat(value, 0.5, 2, dbDefaults.Scale)
-			addon:Reload()
-		end,
-	})
-
-	scaleSlider.Slider:SetPoint("TOPLEFT", widthSlider.Slider, "BOTTOMLEFT", 0, -verticalSpacing * 3)
 
 	local textSizeSlider = mini:Slider({
 		Parent = panel,
@@ -215,7 +196,7 @@ function M:Init()
 		end,
 	})
 
-	textSizeSlider.Slider:SetPoint("LEFT", scaleSlider.Slider, "RIGHT", horizontalSpacing, 0)
+	textSizeSlider.Slider:SetPoint("TOPLEFT", widthSlider.Slider, "BOTTOMLEFT", 0, -verticalSpacing * 3)
 
 	local textureDdl = mini:Dropdown({
 		Parent = panel,
@@ -236,7 +217,7 @@ function M:Init()
 		Text = "Look & Feel",
 	})
 
-	textureDivider:SetPoint("TOP", scaleSlider.Slider, "BOTTOM", 0, -verticalSpacing)
+	textureDivider:SetPoint("TOP", textSizeSlider.Slider, "BOTTOM", 0, -verticalSpacing)
 	textureDivider:SetPoint("LEFT", panel, "LEFT")
 	textureDivider:SetPoint("RIGHT", panel, "RIGHT", -horizontalSpacing, 0)
 

@@ -1,5 +1,6 @@
 local addonName, addon = ...
 local loader = CreateFrame("Frame")
+local libDD = LibStub and LibStub:GetLibrary("LibUIDropDownMenu-4.0", false)
 local loaded = false
 local onLoadCallbacks = {}
 local dropDownId = 1
@@ -473,8 +474,7 @@ end
 
 ---Creates a dropdown menu using the specified options.
 ---@param options DropdownOptions
----@return table the dropdown menu control
----@return boolean true if used a modern dropdown, otherwise false
+---@return DropdownReturn
 function M:Dropdown(options)
 	if not options then
 		error("Dropdown - options must not be nil.")
@@ -484,8 +484,23 @@ function M:Dropdown(options)
 		error("Dropdown - invalid options.")
 	end
 
+	local label
+	local dd
+	local modern = false
+	local width = options.Width or 200
+	local dropdownWidth = options.Width
+
+	if options.LabelText then
+		label = options.Parent:CreateFontString(nil, "ARTWORK", "GameFontWhite")
+		label:SetText(options.LabelText)
+
+		dropdownWidth = dropdownWidth - M.HorizontalSpacing - label:GetStringWidth()
+	end
+
 	if MenuUtil and MenuUtil.CreateRadioMenu then
-		local dd = CreateFrame("DropdownButton", nil, options.Parent, "WowStyle1DropdownTemplate")
+		dd = CreateFrame("DropdownButton", nil, options.Parent, "WowStyle1DropdownTemplate")
+		modern = true
+
 		dd:SetupMenu(function(_, rootDescription)
 			for _, value in ipairs(options.Items) do
 				local text = options.GetText and options.GetText(value) or tostring(value)
@@ -502,16 +517,12 @@ function M:Dropdown(options)
 			ddSelf:Update()
 		end
 
+		dd:SetWidth(dropdownWidth)
+
 		AddControlForRefresh(options.Parent, dd)
-
-		return dd, true
-	end
-
-	local libDD = LibStub and LibStub:GetLibrary("LibUIDropDownMenu-4.0", false)
-
-	if libDD then
+	elseif libDD then
 		-- needs a name to not bug out
-		local dd = libDD:Create_UIDropDownMenu("MiniArenaDebuffsDropdown" .. dropDownId, options.Parent)
+		dd = libDD:Create_UIDropDownMenu("MiniArenaDebuffsDropdown" .. dropDownId, options.Parent)
 		dropDownId = dropDownId + 1
 
 		libDD:UIDropDownMenu_Initialize(dd, function()
@@ -544,6 +555,9 @@ function M:Dropdown(options)
 			end
 		end)
 
+		libDD:UIDropDownMenu_SetWidth(dd, dropdownWidth)
+		libDD:UIDropDownMenu_SetButtonWidth(dd, dropdownWidth)
+
 		function dd.MiniRefresh()
 			local value = options.GetValue()
 			local text = options.GetText and options.GetText(value) or tostring(value)
@@ -551,13 +565,8 @@ function M:Dropdown(options)
 		end
 
 		AddControlForRefresh(options.Parent, dd)
-
-		return dd, false
-	end
-
-	-- UIDropDownMenuTemplate is nil, but still usable
-	if UIDropDownMenu_Initialize then
-		local dd = CreateFrame("Frame", name, options.Parent, "UIDropDownMenuTemplate")
+	elseif UIDropDownMenu_Initialize then
+		dd = CreateFrame("Frame", name, options.Parent, "UIDropDownMenuTemplate")
 
 		UIDropDownMenu_Initialize(dd, function()
 			for _, value in ipairs(options.Items) do
@@ -582,12 +591,15 @@ function M:Dropdown(options)
 
 				UIDropDownMenu_AddButton(info, 1)
 
-				if getValue() == value then
+				if options.GetValue() == value then
 					local id = dd:GetID(info)
 					UIDropDownMenu_SetSelectedID(dd, id)
 				end
 			end
 		end)
+
+		UIDropDownMenu_SetWidth(dd, dropdownWidth)
+		UIDropDownMenu_SetButtonWidth(dd, dropdownWidth)
 
 		function dd.MiniRefresh()
 			local value = options.GetValue()
@@ -596,11 +608,19 @@ function M:Dropdown(options)
 		end
 
 		AddControlForRefresh(options.Parent, dd)
-
-		return dd, false
+	else
+		error("Failed to create a dropdown control")
 	end
 
-	error("Failed to create a dropdown control")
+	if label  then
+		dd:SetPoint("LEFT", label, "RIGHT", M.HorizontalSpacing, 0)
+	end
+
+	return {
+		Dropdown = dd,
+		Modern = modern,
+		Label = label,
+	}
 end
 
 ---Creates a checkbox using the specified options.
@@ -947,8 +967,15 @@ loader:SetScript("OnEvent", OnAddonLoaded)
 ---@field EditBox table
 ---@field Label table
 
+---@class DropdownReturn
+---@field Dropdown table
+---@field Modern boolean true if used a modern dropdown, otherwise false
+---@field Label table
+
 ---@class DropdownOptions
 ---@field Parent table
+---@field LabelText? string
+---@field Width number
 ---@field Items any[]
 ---@field Tooltip string?
 ---@field GetValue fun(): string

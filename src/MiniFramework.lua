@@ -487,8 +487,7 @@ function M:Dropdown(options)
 	local label
 	local dd
 	local modern = false
-	local width = options.Width or 200
-	local dropdownWidth = options.Width
+	local dropdownWidth = options.Width or 200
 
 	if options.LabelText then
 		label = options.Parent:CreateFontString(nil, "ARTWORK", "GameFontWhite")

@@ -65,29 +65,48 @@ local function AddBlackOutline(frame)
 	return outline
 end
 
-local function CreateStatusBar(parent)
-	local texture = GetConfiguredTexture()
-	local bar = CreateFrame("StatusBar", nil, parent)
+local function CreateFadeAnimations()
+	container.FadeIn = container:CreateAnimationGroup()
 
-	bar:SetStatusBarTexture(texture)
+	local fadeInAlpha = container.FadeIn:CreateAnimation("Alpha")
+	fadeInAlpha:SetOrder(1)
+	fadeInAlpha:SetFromAlpha(0)
+	fadeInAlpha:SetToAlpha(1)
+	fadeInAlpha:SetSmoothing("OUT")
+	container.FadeIn.Alpha = fadeInAlpha
 
-	local sbTex = bar:GetStatusBarTexture()
+	container.FadeIn:SetScript("OnPlay", function()
+		container:Show()
+	end)
 
-	if not sbTex then
-		bar:SetStatusBarTexture(fallbackTexture)
-		sbTex = bar:GetStatusBarTexture()
-	end
+	container.FadeIn:SetScript("OnFinished", function()
+		if container.IsShowing then
+			container:SetAlpha(1)
+		end
+	end)
 
-	if sbTex then
-		sbTex:SetHorizTile(false)
-		sbTex:SetVertTile(false)
-	end
+	container.FadeOut = container:CreateAnimationGroup()
 
-	bar.Background = bar:CreateTexture(nil, "BACKGROUND")
-	bar.Background:SetAllPoints(true)
-	bar.Background:SetTexture(tex)
+	local fadeOutAlpha = container.FadeOut:CreateAnimation("Alpha")
+	fadeOutAlpha:SetOrder(1)
+	fadeOutAlpha:SetFromAlpha(1)
+	fadeOutAlpha:SetToAlpha(0)
+	fadeOutAlpha:SetSmoothing("OUT")
+	container.FadeOut.Alpha = fadeOutAlpha
 
-	return bar
+	container.FadeOut:SetScript("OnFinished", function()
+		if not container.IsShowing then
+			container:Hide()
+		end
+	end)
+end
+
+local function CreateBackground(statusBar)
+	local background = statusBar:CreateTexture(nil, "BACKGROUND")
+	background:SetAllPoints(true)
+	background:SetTexture(tex)
+
+	return background
 end
 
 local function SetBarColor(bar, r, g, b)
@@ -99,6 +118,50 @@ local function SetBarColor(bar, r, g, b)
 
 	if bar.Background then
 		bar.Background:SetVertexColor(0.1, 0.1, 0.1, 0.5)
+	end
+end
+
+local function FadeTo(show)
+	CreateFadeAnimations()
+
+	if container.IsShowing == show then
+		return
+	end
+
+	container.IsShowing = show and true or false
+
+	if show then
+		if container.FadeOut and container.FadeOut:IsPlaying() then
+			container.FadeOut:Stop()
+		end
+
+		if container.FadeIn and container.FadeIn.Alpha then
+			container.FadeIn.Alpha:SetDuration(db.FadeInDuration or 1)
+			container.FadeIn.Alpha:SetFromAlpha(0)
+			container.FadeIn.Alpha:SetToAlpha(1)
+
+			container.FadeIn:Stop()
+			container.FadeIn:Play()
+		else
+			container:SetAlpha(1)
+			container:Show()
+		end
+	else
+		if container.FadeIn and container.FadeIn:IsPlaying() then
+			container.FadeIn:Stop()
+		end
+
+		if container.FadeOut and container.FadeOut.Alpha then
+			container.FadeOut.Alpha:SetDuration(db.FadeOutDuration or 1)
+			container.FadeOut.Alpha:SetFromAlpha(1)
+			container.FadeOut.Alpha:SetToAlpha(0)
+
+			container.FadeOut:Stop()
+			container.FadeOut:Play()
+		else
+			container:SetAlpha(0)
+			container:Hide()
+		end
 	end
 end
 
@@ -212,91 +275,25 @@ local function UpdateTextures()
 	healthBar:SetStatusBarTexture(texture)
 	powerBar:SetStatusBarTexture(texture)
 
-	local didTextureLoad = healthBar:GetStatusBarTexture()
+	local hpTexture = healthBar:GetStatusBarTexture()
+	local powerTexture = powerBar:GetStatusBarTexture()
 
-	if didTextureLoad == nil then
+	if sbTexture == nil then
 		healthBar:SetStatusBarTexture(fallbackTexture)
 		powerBar:SetStatusBarTexture(fallbackTexture)
-	end
-end
 
-local function CreateFadeAnimations()
-	container.FadeIn = container:CreateAnimationGroup()
-
-	local fadeInAlpha = container.FadeIn:CreateAnimation("Alpha")
-	fadeInAlpha:SetOrder(1)
-	fadeInAlpha:SetFromAlpha(0)
-	fadeInAlpha:SetToAlpha(1)
-	fadeInAlpha:SetSmoothing("OUT")
-	container.FadeIn.Alpha = fadeInAlpha
-
-	container.FadeIn:SetScript("OnPlay", function()
-		container:Show()
-	end)
-
-	container.FadeIn:SetScript("OnFinished", function()
-		if container.IsShowing then
-			container:SetAlpha(1)
-		end
-	end)
-
-	container.FadeOut = container:CreateAnimationGroup()
-
-	local fadeOutAlpha = container.FadeOut:CreateAnimation("Alpha")
-	fadeOutAlpha:SetOrder(1)
-	fadeOutAlpha:SetFromAlpha(1)
-	fadeOutAlpha:SetToAlpha(0)
-	fadeOutAlpha:SetSmoothing("OUT")
-	container.FadeOut.Alpha = fadeOutAlpha
-
-	container.FadeOut:SetScript("OnFinished", function()
-		if not container.IsShowing then
-			container:Hide()
-		end
-	end)
-end
-
-local function FadeTo(show)
-	CreateFadeAnimations()
-
-	if container.IsShowing == show then
-		return
+		hpTexture = healthBar:GetStatusBarTexture()
+		powerTexture = powerBar:GetStatusBarTexture()
 	end
 
-	container.IsShowing = show and true or false
+	if hpTexture then
+		hpTexture:SetHorizTile(false)
+		hpTexture:SetVertTile(false)
+	end
 
-	if show then
-		if container.FadeOut and container.FadeOut:IsPlaying() then
-			container.FadeOut:Stop()
-		end
-
-		if container.FadeIn and container.FadeIn.Alpha then
-			container.FadeIn.Alpha:SetDuration(db.FadeInDuration or 1)
-			container.FadeIn.Alpha:SetFromAlpha(0)
-			container.FadeIn.Alpha:SetToAlpha(1)
-
-			container.FadeIn:Stop()
-			container.FadeIn:Play()
-		else
-			container:SetAlpha(1)
-			container:Show()
-		end
-	else
-		if container.FadeIn and container.FadeIn:IsPlaying() then
-			container.FadeIn:Stop()
-		end
-
-		if container.FadeOut and container.FadeOut.Alpha then
-			container.FadeOut.Alpha:SetDuration(db.FadeOutDuration or 1)
-			container.FadeOut.Alpha:SetFromAlpha(1)
-			container.FadeOut.Alpha:SetToAlpha(0)
-
-			container.FadeOut:Stop()
-			container.FadeOut:Play()
-		else
-			container:SetAlpha(0)
-			container:Hide()
-		end
+	if powerTexture then
+		powerTexture:SetHorizTile(false)
+		powerTexture:SetVertTile(false)
 	end
 end
 
@@ -307,6 +304,11 @@ local function UpdateVisibility()
 	end
 
 	FadeTo(UnitAffectingCombat("player"))
+end
+
+local function UpdateFonts()
+	healthText:SetFont(db.Font or "Fonts\\FRIZQT__.TTF", db.FontSize or 11, db.FontFlags or "OUTLINE")
+	powerText:SetFont(db.Font or "Fonts\\FRIZQT__.TTF", db.FontSize or 11, db.FontFlags or "OUTLINE")
 end
 
 local function Load()
@@ -330,8 +332,13 @@ local function Load()
 
 	CreateFadeAnimations()
 
-	healthBar = CreateStatusBar(container)
-	powerBar = CreateStatusBar(container)
+	healthBar = CreateFrame("StatusBar", nil, parent)
+	healthBar.Background = CreateBackground(healthBar)
+
+	powerBar = CreateFrame("StatusBar", nil, parent)
+	powerBar.Background = CreateBackground(powerBar)
+
+	UpdateTextures()
 
 	local baseLevel = container:GetFrameLevel() or 0
 	healthBar:SetFrameLevel(baseLevel + 1)
@@ -343,12 +350,12 @@ local function Load()
 	end
 
 	healthText = healthBar:CreateFontString(nil, "OVERLAY")
-	healthText:SetFont(db.Font or "Fonts\\FRIZQT__.TTF", db.FontSize or 11, db.FontFlags or "OUTLINE")
 	healthText:SetPoint("CENTER", healthBar, "CENTER", 0, 0)
 
 	powerText = powerBar:CreateFontString(nil, "OVERLAY")
-	powerText:SetFont(db.Font or "Fonts\\FRIZQT__.TTF", db.FontSize or 11, db.FontFlags or "OUTLINE")
 	powerText:SetPoint("CENTER", powerBar, "CENTER", 0, 0)
+
+	UpdateFonts()
 
 	addon:Reload()
 end
@@ -416,6 +423,7 @@ function addon:Reload()
 	UpdateHealth()
 	UpdatePower()
 	UpdateTextures()
+	UpdateFonts()
 end
 
 mini:WaitForAddonLoad(OnAddonLoaded)

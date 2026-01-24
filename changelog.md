@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.3.2
+
+Added missing library.
+
 ## 1.3.1
 
 Fixed bars showing on screen always.

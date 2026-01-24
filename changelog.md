@@ -1,8 +1,14 @@
 # Changelog
 
+## 1.3.0
+
+- Removed scale slider.
+- Fixed texture dropdown.
+- Lowered height floor.
+
 ## 1.2.0
 
-- Added config options for scale and texture.
+Added config options for scale and texture.
 
 ## 1.1.0
 

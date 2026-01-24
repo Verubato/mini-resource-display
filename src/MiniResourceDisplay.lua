@@ -277,7 +277,7 @@ local function UpdateTextures()
 	local hpTexture = healthBar:GetStatusBarTexture()
 	local powerTexture = powerBar:GetStatusBarTexture()
 
-	if sbTexture == nil then
+	if hpTexture == nil then
 		healthBar:SetStatusBarTexture(fallbackTexture)
 		powerBar:SetStatusBarTexture(fallbackTexture)
 

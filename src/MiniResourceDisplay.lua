@@ -331,10 +331,10 @@ local function Load()
 
 	CreateFadeAnimations()
 
-	healthBar = CreateFrame("StatusBar", nil, parent)
+	healthBar = CreateFrame("StatusBar", nil, container)
 	healthBar.Background = CreateBackground(healthBar)
 
-	powerBar = CreateFrame("StatusBar", nil, parent)
+	powerBar = CreateFrame("StatusBar", nil, container)
 	powerBar.Background = CreateBackground(powerBar)
 
 	UpdateTextures()

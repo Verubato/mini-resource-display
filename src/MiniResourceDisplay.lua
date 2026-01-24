@@ -174,7 +174,6 @@ local function UpdateSizes()
 	local totalWidth = w + pad * 2
 	local totalHeight = (h * 2) + gap + pad * 2
 
-	container:SetScale(db.Scale or 1)
 	container:SetSize(totalWidth, totalHeight)
 
 	healthBar:ClearAllPoints()

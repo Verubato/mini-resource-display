@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.4.0
+
+- Added background to the bars so they aren't see through.
+- Added smoothing between value transitions.
+
 ## 1.3.2
 
 Added missing library.

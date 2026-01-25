@@ -9,6 +9,7 @@ local powerBar
 local healthText
 local powerText
 local fallbackTexture = "Interface\\TARGETINGFRAME\\UI-StatusBar"
+local smoothing = Enum and Enum.StatusBarInterpolation and Enum.StatusBarInterpolation.ExponentialEaseOut
 ---@type Db
 local db
 
@@ -207,7 +208,7 @@ local function UpdateHealth()
 	local max = UnitHealthMax("player") or 1
 
 	healthBar:SetMinMaxValues(0, max)
-	healthBar:SetValue(hp)
+	healthBar:SetValue(hp, smoothing)
 
 	if db.ShowText then
 		local format = db.HealthTextFormat or "%s/%s"
@@ -240,7 +241,7 @@ local function UpdatePower()
 	local max = UnitPowerMax("player", powerType) or 1
 
 	powerBar:SetMinMaxValues(0, max)
-	powerBar:SetValue(power)
+	powerBar:SetValue(power, smoothing)
 
 	local r, g, b = GetPowerColor()
 

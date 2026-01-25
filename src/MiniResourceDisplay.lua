@@ -104,7 +104,6 @@ end
 local function CreateBackground(statusBar)
 	local background = statusBar:CreateTexture(nil, "BACKGROUND")
 	background:SetAllPoints(true)
-	background:SetTexture(tex)
 
 	return background
 end
@@ -117,7 +116,7 @@ local function SetBarColor(bar, r, g, b)
 	bar:SetStatusBarColor(r, g, b, 1)
 
 	if bar.Background then
-		bar.Background:SetVertexColor(0.1, 0.1, 0.1, 0.5)
+		bar.Background:SetVertexColor(0.1, 0.1, 0.1, 1.0)
 	end
 end
 
@@ -293,6 +292,14 @@ local function UpdateTextures()
 	if powerTexture then
 		powerTexture:SetHorizTile(false)
 		powerTexture:SetVertTile(false)
+	end
+
+	if texture and healthBar.Background then
+		healthBar.Background:SetTexture(texture)
+	end
+
+	if texture and powerBar.Background then
+		powerBar.Background:SetTexture(texture)
 	end
 end
 

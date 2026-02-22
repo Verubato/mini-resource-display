@@ -6,6 +6,7 @@ local eventsFrame
 local container
 local healthBar
 local powerBar
+local absorbBar
 local healthText
 local powerText
 local fallbackTexture = "Interface\\TARGETINGFRAME\\UI-StatusBar"
@@ -246,6 +247,18 @@ local function UpdateHealth()
 	end
 end
 
+local function UpdateAbsorb()
+	if not absorbBar then
+		return
+	end
+
+	local maxHealth = UnitHealthMax("player") or 0
+	local totalAbsorbs = UnitGetTotalAbsorbs("player") or 0
+
+	absorbBar:SetMinMaxValues(0, maxHealth)
+	absorbBar:SetValue(totalAbsorbs)
+end
+
 local function GetPowerColor()
 	if db.PowerUseTypeColor then
 		local pType = UnitPowerType("player")
@@ -380,6 +393,22 @@ local function Load()
 	healthBar = CreateFrame("StatusBar", nil, container)
 	healthBar.Background = CreateBackground(healthBar)
 
+	absorbBar = CreateFrame("StatusBar", nil, healthBar)
+	absorbBar:SetAllPoints(healthBar)
+	absorbBar:SetReverseFill(true)
+	absorbBar:SetStatusBarTexture("Interface\\RaidFrame\\Shield-Overlay")
+	-- draw at same level as health bar (not above)
+	absorbBar:SetFrameLevel(healthBar:GetFrameLevel())
+	absorbBar:SetStatusBarColor(1, 1, 1, 0.5)
+
+	local absTex = absorbBar:GetStatusBarTexture()
+	if absTex then
+		absTex:SetTexture("Interface\\RaidFrame\\Shield-Overlay", "REPEAT", "REPEAT")
+		absTex:SetHorizTile(true)
+		absTex:SetVertTile(true)
+		absTex:SetDrawLayer("ARTWORK", 1)
+	end
+
 	powerBar = CreateFrame("StatusBar", nil, container)
 	powerBar.Background = CreateBackground(powerBar)
 
@@ -409,6 +438,7 @@ local function OnEvent(_, event, arg1)
 	if event == "PLAYER_ENTERING_WORLD" then
 		UpdateVisibility()
 		UpdateHealth()
+		UpdateAbsorb()
 		UpdatePower()
 		return
 	end
@@ -431,6 +461,13 @@ local function OnEvent(_, event, arg1)
 		end
 		return
 	end
+
+	if event == "UNIT_ABSORB_AMOUNT_CHANGED" or event == "UNIT_HEAL_ABSORB_AMOUNT_CHANGED" then
+		if arg1 == "player" then
+			UpdateAbsorb()
+		end
+		return
+	end
 end
 
 local function OnAddonLoaded()
@@ -450,11 +487,15 @@ local function OnAddonLoaded()
 		eventsFrame:RegisterUnitEvent("UNIT_POWER_UPDATE", "player")
 		eventsFrame:RegisterUnitEvent("UNIT_POWER_FREQUENT", "player")
 		eventsFrame:RegisterUnitEvent("UNIT_DISPLAYPOWER", "player")
+		eventsFrame:RegisterUnitEvent("UNIT_ABSORB_AMOUNT_CHANGED", "player")
+		eventsFrame:RegisterUnitEvent("UNIT_HEAL_ABSORB_AMOUNT_CHANGED", "player")
 	else
 		eventsFrame:RegisterEvent("UNIT_HEALTH")
 		eventsFrame:RegisterEvent("UNIT_POWER_UPDATE")
 		eventsFrame:RegisterEvent("UNIT_POWER_FREQUENT")
 		eventsFrame:RegisterEvent("UNIT_DISPLAYPOWER")
+		eventsFrame:RegisterEvent("UNIT_ABSORB_AMOUNT_CHANGED")
+		eventsFrame:RegisterEvent("UNIT_HEAL_ABSORB_AMOUNT_CHANGED")
 	end
 
 	eventsFrame:SetScript("OnEvent", OnEvent)
@@ -466,6 +507,7 @@ function addon:Reload()
 	UpdateColors()
 	UpdateVisibility()
 	UpdateHealth()
+	UpdateAbsorb()
 	UpdatePower()
 	UpdateTextures()
 	UpdateFonts()

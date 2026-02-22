@@ -417,12 +417,11 @@ local function Load()
 	healthBar = CreateFrame("StatusBar", nil, container)
 	healthBar.Background = CreateBackground(healthBar)
 
-	absorbBar = CreateFrame("StatusBar", nil, healthBar)
+	absorbBar = CreateFrame("StatusBar", nil, container)
 	absorbBar:SetAllPoints(healthBar)
 	absorbBar:SetReverseFill(true)
 	absorbBar:SetStatusBarTexture("Interface\\RaidFrame\\Shield-Overlay")
-	-- draw at same level as health bar (not above)
-	absorbBar:SetFrameLevel(healthBar:GetFrameLevel())
+	-- frame level will be set after baseLevel is calculated so it matches other bars
 	absorbBar:SetStatusBarColor(1, 1, 1, 0.5)
 
 	local absTex = absorbBar:GetStatusBarTexture()
@@ -441,6 +440,8 @@ local function Load()
 	local baseLevel = container:GetFrameLevel() or 0
 	healthBar:SetFrameLevel(baseLevel + 1)
 	powerBar:SetFrameLevel(baseLevel + 1)
+	-- ensure absorb bar draws with the bars but not above them
+	absorbBar:SetFrameLevel(baseLevel + 1)
 
 	if db.Border then
 		healthBar.Outline = AddBlackOutline(healthBar)

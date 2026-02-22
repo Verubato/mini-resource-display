@@ -1,6 +1,5 @@
 local addonName, addon = ...
 local loader = CreateFrame("Frame")
-local libDD = LibStub and LibStub:GetLibrary("LibUIDropDownMenu-4.0", false)
 local loaded = false
 local onLoadCallbacks = {}
 local dropDownId = 1
@@ -14,16 +13,6 @@ local M = {
 	TextMaxWidth = 600,
 }
 addon.Framework = M
-
-local function NilKeys(target)
-	for k, v in pairs(target) do
-		if type(v) == "table" then
-			NilKeys(v)
-		else
-			target[k] = nil
-		end
-	end
-end
 
 local function AddControlForRefresh(panel, control)
 	-- store controls for refresh behaviour
@@ -39,6 +28,10 @@ local function AddControlForRefresh(panel, control)
 			if c.MiniRefresh then
 				c:MiniRefresh()
 			end
+		end
+
+		if panel.OnMiniRefresh then
+			panel:OnMiniRefresh()
 		end
 	end
 end
@@ -103,9 +96,20 @@ local function GetOrCreateDialog()
 	})
 	dialog:SetBackdropColor(0, 0, 0, 0.9)
 
+	dialog.Title = dialog:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
+	dialog.Title:SetPoint("TOP", dialog, "TOP", 0, -8)
+	dialog.Title:SetText("Notification")
+	dialog.Title:SetTextColor(1, 0.82, 0)
+
+	dialog.TitleDivider = dialog:CreateTexture(nil, "ARTWORK")
+	dialog.TitleDivider:SetHeight(1)
+	dialog.TitleDivider:SetPoint("TOPLEFT", dialog, "TOPLEFT", 8, -28)
+	dialog.TitleDivider:SetPoint("TOPRIGHT", dialog, "TOPRIGHT", -8, -28)
+	dialog.TitleDivider:SetColorTexture(1, 1, 1, 0.15)
+
 	dialog.Text = dialog:CreateFontString(nil, "ARTWORK", "GameFontHighlightLarge")
-	dialog.Text:SetPoint("TOPLEFT", 12, -12)
-	dialog.Text:SetPoint("TOPRIGHT", -12, -12)
+	dialog.Text:SetPoint("TOPLEFT", 12, -40)
+	dialog.Text:SetPoint("TOPRIGHT", -12, -40)
 	dialog.Text:SetJustifyH("LEFT")
 	dialog.Text:SetJustifyV("TOP")
 
@@ -120,6 +124,16 @@ local function GetOrCreateDialog()
 	return dialog
 end
 
+local function NilKeys(target)
+	for k, v in pairs(target) do
+		if type(v) == "table" then
+			NilKeys(v)
+		else
+			target[k] = nil
+		end
+	end
+end
+
 function M:Notify(msg, ...)
 	local formatted = string.format(msg, ...)
 	print(addonName .. " - " .. formatted)
@@ -127,14 +141,6 @@ end
 
 function M:NotifyCombatLockdown()
 	M:Notify("Can't do that during combat.")
-end
-
-function M:IsSecret(value)
-	if not issecretvalue then
-		return false
-	end
-
-	return issecretvalue(value)
 end
 
 function M:CopyTable(src, dst)
@@ -189,6 +195,14 @@ function M:ClampFloat(v, minV, maxV, fallback)
 	end
 
 	return v
+end
+
+function M:IsSecret(value)
+	if not issecretvalue then
+		return false
+	end
+
+	return issecretvalue(value)
 end
 
 function M:CanOpenOptionsDuringCombat()
@@ -353,6 +367,112 @@ function M:TextBlock(options)
 	return container
 end
 
+---@param options TextBlockSegmentedOptions
+function M:TextBlockSegmented(options)
+	if not options or not options.Parent or not options.Lines then
+		error("TextBlockSegmented - invalid options.")
+	end
+
+	local prefixFont = options.PrefixFont or "GameFontWhite"
+	local textFont = options.TextFont or "GameFontNormal"
+	local suffixFont = options.SuffixFont or "GameFontWhite"
+	local verticalSpacing = options.VerticalSpacing or M.VerticalSpacing
+	local segmentSpacing = options.SegmentSpacing or 0
+
+	local container = CreateFrame("Frame", nil, options.Parent)
+	container:SetWidth(M.TextMaxWidth)
+
+	local prevLine
+	local totalHeight = 0
+
+	local function ApplyFont(fs, font)
+		if type(font) == "string" then
+			fs:SetFontObject(_G[font] or GameFontWhite)
+		elseif type(font) == "table" then
+			fs:SetFontObject(font)
+		else
+			fs:SetFontObject(GameFontWhite)
+		end
+	end
+
+	local function CreateSeg(parent, text, font, width)
+		local fs = parent:CreateFontString(nil, "ARTWORK", "GameFontWhite")
+		fs:SetJustifyH("LEFT")
+		fs:SetSpacing(0)
+
+		ApplyFont(fs, font)
+
+		if width then
+			fs:SetWidth(width)
+		end
+
+		fs:SetText(text or "")
+		return fs
+	end
+
+	for i, entry in ipairs(options.Lines) do
+		local gap = (i == 1) and 0 or (verticalSpacing / 2)
+
+		local lineFrame = CreateFrame("Frame", nil, container)
+		lineFrame:SetWidth(M.TextMaxWidth)
+
+		if i == 1 then
+			lineFrame:SetPoint("TOPLEFT", container, "TOPLEFT", 0, 0)
+		else
+			lineFrame:SetPoint("TOPLEFT", prevLine, "BOTTOMLEFT", 0, -gap)
+		end
+
+		local segments = {}
+
+		if type(entry) == "string" then
+			segments[1] = CreateSeg(lineFrame, entry, suffixFont)
+		else
+			if entry.Prefix then
+				segments[#segments + 1] = CreateSeg(lineFrame, entry.Prefix, prefixFont)
+			end
+
+			if entry.Text then
+				segments[#segments + 1] = CreateSeg(lineFrame, entry.Text, textFont)
+			end
+
+			if entry.Suffix then
+				segments[#segments + 1] = CreateSeg(lineFrame, entry.Suffix, suffixFont)
+			end
+		end
+
+		-- Anchor segments
+		for s = 1, #segments do
+			if s == 1 then
+				segments[s]:SetPoint("TOPLEFT", lineFrame, "TOPLEFT", 0, 0)
+			else
+				segments[s]:SetPoint("TOPLEFT", segments[s - 1], "TOPRIGHT", segmentSpacing, 0)
+			end
+		end
+
+		-- Last segment wraps
+		local used = 0
+		for s = 1, #segments - 1 do
+			used = used + segments[s]:GetStringWidth() + segmentSpacing
+		end
+
+		local remain = math.max(10, M.TextMaxWidth - used)
+		segments[#segments]:SetWidth(remain)
+
+		-- Height calc
+		local height = 1
+		for _, fs in ipairs(segments) do
+			height = math.max(height, fs:GetStringHeight())
+		end
+
+		lineFrame:SetHeight(height)
+		totalHeight = totalHeight + gap + height
+		prevLine = lineFrame
+	end
+
+	container:SetHeight(math.max(1, totalHeight))
+	return container
+end
+
 ---Creates a horizontal line with a label.
 ---@param options DividerOptions
 ---@return table
@@ -380,11 +500,11 @@ function M:Divider(options)
 	label:SetText(options.Text or "")
 	label:SetPoint("CENTER", container, "CENTER")
 
-	leftLine:SetPoint("LEFT", 16, 0)
+	leftLine:SetPoint("LEFT", 0, 0)
 	leftLine:SetPoint("RIGHT", label, "LEFT", -8, 0)
 
 	rightLine:SetPoint("LEFT", label, "RIGHT", 8, 0)
-	rightLine:SetPoint("RIGHT", -16, 0)
+	rightLine:SetPoint("RIGHT", 0, 0)
 
 	return container
 end
@@ -485,8 +605,6 @@ function M:Dropdown(options)
 	end
 
 	local label
-	local dd
-	local modern = false
 	local dropdownWidth = options.Width or 200
 
 	if options.LabelText then
@@ -497,8 +615,7 @@ function M:Dropdown(options)
 	end
 
 	if MenuUtil and MenuUtil.CreateRadioMenu then
-		dd = CreateFrame("DropdownButton", nil, options.Parent, "WowStyle1DropdownTemplate")
-		modern = true
+		local dd = CreateFrame("DropdownButton", nil, options.Parent, "WowStyle1DropdownTemplate")
 
 		dd:SetupMenu(function(_, rootDescription)
 			for _, value in ipairs(options.Items) do
@@ -519,9 +636,23 @@ function M:Dropdown(options)
 		dd:SetWidth(dropdownWidth)
 
 		AddControlForRefresh(options.Parent, dd)
-	elseif libDD then
+
+		if label then
+			dd:SetPoint("LEFT", label, "RIGHT", M.HorizontalSpacing, 0)
+		end
+
+		return {
+			Dropdown = dd,
+			Modern = true,
+			Label = label,
+		}
+	end
+
+	local libDD = LibStub and LibStub:GetLibrary("LibUIDropDownMenu-4.0", true)
+
+	if libDD then
 		-- needs a name to not bug out
-		dd = libDD:Create_UIDropDownMenu("MiniArenaDebuffsDropdown" .. dropDownId, options.Parent)
+		local dd = libDD:Create_UIDropDownMenu(addonName .. "Dropdown" .. dropDownId, options.Parent)
 		dropDownId = dropDownId + 1
 
 		libDD:UIDropDownMenu_Initialize(dd, function()
@@ -564,8 +695,20 @@ function M:Dropdown(options)
 		end
 
 		AddControlForRefresh(options.Parent, dd)
-	elseif UIDropDownMenu_Initialize then
-		dd = CreateFrame("Frame", name, options.Parent, "UIDropDownMenuTemplate")
+
+		if label then
+			dd:SetPoint("LEFT", label, "RIGHT", M.HorizontalSpacing, 0)
+		end
+
+		return {
+			Dropdown = dd,
+			Modern = false,
+			Label = label,
+		}
+	end
+
+	if UIDropDownMenu_Initialize then
+		local dd = CreateFrame("Frame", name, options.Parent, "UIDropDownMenuTemplate")
 
 		UIDropDownMenu_Initialize(dd, function()
 			for _, value in ipairs(options.Items) do
@@ -607,19 +750,19 @@ function M:Dropdown(options)
 		end
 
 		AddControlForRefresh(options.Parent, dd)
-	else
-		error("Failed to create a dropdown control")
+
+		if label then
+			dd:SetPoint("LEFT", label, "RIGHT", M.HorizontalSpacing, 0)
+		end
+
+		return {
+			Dropdown = dd,
+			Modern = false,
+			Label = label,
+		}
 	end
 
-	if label  then
-		dd:SetPoint("LEFT", label, "RIGHT", M.HorizontalSpacing, 0)
-	end
-
-	return {
-		Dropdown = dd,
-		Modern = modern,
-		Label = label,
-	}
+	error("Failed to create a dropdown control")
 end
 
 ---Creates a checkbox using the specified options.
@@ -716,11 +859,39 @@ function M:Slider(options)
 		ConfigureNumbericBox(box, options.Min < 0)
 	end
 
+	local function GetDecimalPlaces(step)
+		local s = tostring(step)
+		local dot = s:find("%.")
+		if not dot then
+			return 0
+		end
+		return #s - dot
+	end
+
+	local function GetMaxLetters(min, max, step)
+		local decimals = GetDecimalPlaces(step)
+
+		local maxAbs = math.max(math.abs(min), math.abs(max))
+		local intDigits = #tostring(math.floor(maxAbs))
+
+		local letters = intDigits
+
+		if decimals > 0 then
+			letters = letters + 1 + decimals -- dot + decimals
+		end
+
+		if min < 0 then
+			letters = letters + 1 -- minus sign
+		end
+
+		return letters
+	end
+
 	box:SetPoint("CENTER", slider, "CENTER", 0, 30)
 	box:SetFontObject("GameFontWhite")
 	box:SetSize(50, 20)
 	box:SetAutoFocus(false)
-	box:SetMaxLetters(math.log(options.Max, 10) + 1 + (hasFloat and 2 or 0))
+	box:SetMaxLetters(GetMaxLetters(options.Min, options.Max, options.Step))
 	box:SetText(tostring(options.GetValue()))
 	box:SetJustifyH("CENTER")
 	box:SetCursorPosition(0)
@@ -768,7 +939,298 @@ function M:Slider(options)
 	return { Slider = slider, EditBox = box, Label = label }
 end
 
----@param options DialogOptions
+---Creates a generic list of items
+---@param options ListOptions
+---@return ListReturn
+function M:List(options)
+	local scroll = CreateFrame("ScrollFrame", nil, options.Parent, "UIPanelScrollFrameTemplate")
+	scroll:SetPoint("TOPLEFT", 0, 0)
+	scroll:SetPoint("BOTTOMRIGHT", options.Parent, "BOTTOMRIGHT", 0, 0)
+
+	local content = CreateFrame("Frame", nil, scroll)
+	content:SetSize(1, 1)
+	scroll:SetScrollChild(content)
+
+	local rows = {}
+	local items = {}
+
+	local function RefreshScrollbar()
+		-- show scroll bar if we've reached the max visible height
+		local visibleHeight = scroll:GetHeight()
+		local contentHeight = content:GetHeight()
+
+		if contentHeight <= visibleHeight then
+			if scroll.ScrollBar then
+				scroll.ScrollBar:Hide()
+			end
+		else
+			if scroll.ScrollBar then
+				scroll.ScrollBar:Show()
+			end
+		end
+	end
+
+	local function Refresh()
+		for _, row in ipairs(rows) do
+			row:Hide()
+		end
+
+		table.sort(items)
+
+		local y = options.RowGap or -2
+
+		for i, item in ipairs(items) do
+			local row = rows[i]
+
+			if not row then
+				row = CreateFrame("Button", nil, content)
+				row:SetSize(options.RowWidth, options.RowHeight)
+
+				row.Text = row:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+				row.Text:SetPoint("LEFT", 0, 0)
+
+				row.Remove = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
+				row.Remove:SetSize(options.RemoveButtonWidth or 80, options.RowHeight - 2)
+				row.Remove:SetPoint("RIGHT", 0, 0)
+				row.Remove:SetText("Remove")
+
+				rows[i] = row
+			end
+
+			row:SetPoint("TOPLEFT", 0, y)
+			row.Text:SetText(item)
+			row:Show()
+
+			row.Remove:SetScript("OnClick", function()
+				for idx, v in ipairs(items) do
+					if v == item then
+						table.remove(items, idx)
+						break
+					end
+				end
+
+				if options.OnRemove then
+					options.OnRemove(item)
+				end
+
+				Refresh()
+			end)
+
+			y = y - options.RowHeight
+		end
+
+		content:SetHeight(math.max(1, -y + 10))
+		RefreshScrollbar()
+	end
+
+	content:HookScript("OnShow", RefreshScrollbar)
+
+	local api = {}
+
+	function api.Add(_, item)
+		table.insert(items, item)
+		Refresh()
+	end
+
+	function api.SetItems(_, newItems)
+		items = newItems or {}
+		Refresh()
+	end
+
+	function api.GetItems(_)
+		return items
+	end
+
+	api.ScrollFrame = scroll
+	api.Content = content
+
+	return api
+end
+
+---@param options TabOptions
+---@return TabReturn
+function M:CreateTabs(options)
+	assert(options and options.Parent, "CreateTabs: options.Parent required")
+	assert(options.Tabs and #options.Tabs > 0, "CreateTabs: options.Tabs required")
+
+	local parent = options.Parent
+	local tabHeight = options.TabHeight or 22
+	local tabMinWidth = options.TabMinWidth or 80
+	local tabSpacing = options.TabSpacing or 6
+	local stripHeight = options.StripHeight or 28
+
+	local insets = options.ContentInsets or {}
+	local insetL = insets.Left or 0
+	local insetR = insets.Right or 0
+	local insetT = insets.Top or 10
+	local insetB = insets.Bottom or 10
+
+	local strip = CreateFrame("Frame", nil, parent, "BackdropTemplate")
+	strip:SetPoint("TOPLEFT", parent, "TOPLEFT", 0, 0)
+	strip:SetPoint("TOPRIGHT", parent, "TOPRIGHT", 0, 0)
+	strip:SetHeight(stripHeight)
+
+	local body = CreateFrame("Frame", nil, parent)
+	body:SetPoint("TOPLEFT", strip, "BOTTOMLEFT", insetL, -insetT)
+	body:SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", -insetR, insetB)
+
+	---@type {Key:string, Title:string, Button:table, Content:table}[]
+	local tabs = {}
+	local keyToIndex = {}
+	local selectedKey
+
+	local function GetIndex(keyOrIndex)
+		if type(keyOrIndex) == "number" then
+			return keyOrIndex
+		end
+		if type(keyOrIndex) == "string" then
+			return keyToIndex[keyOrIndex]
+		end
+	end
+
+	local function SizeToText(btn)
+		local fs = btn.Text
+		local w = tabMinWidth
+		if fs and fs.GetUnboundedStringWidth then
+			w = math.max(tabMinWidth, fs:GetUnboundedStringWidth() + 26)
+		elseif fs and fs.GetStringWidth then
+			w = math.max(tabMinWidth, fs:GetStringWidth() + 26)
+		end
+		btn:SetWidth(w)
+	end
+
+	local normalR, normalG, normalB = GameFontNormal:GetTextColor()
+
+	local function SetSelected(btn, isSelected)
+		if isSelected then
+			btn:SetBackdropColor(0.14, 0.14, 0.14, 0.92)
+			btn:SetBackdropBorderColor(0.9, 0.75, 0.2, 0.9)
+
+			btn.Text:SetTextColor(1, 1, 1, 1)
+
+			btn.BottomEdge:Hide()
+			btn.BottomLeftCorner:Hide()
+			btn.BottomRightCorner:Hide()
+
+			btn.Highlight:SetAlpha(0)
+		else
+			btn:SetBackdropColor(0.08, 0.08, 0.08, 0.65)
+			btn:SetBackdropBorderColor(0, 0, 0, 0.55)
+
+			btn.Text:SetTextColor(normalR, normalG, normalB, 1)
+
+			btn.BottomEdge:Show()
+			btn.BottomLeftCorner:Show()
+			btn.BottomRightCorner:Show()
+
+			btn.Highlight:SetAlpha(0.08)
+		end
+	end
+
+	local controller = {}
+
+	function controller.GetSelected(_)
+		return selectedKey
+	end
+
+	function controller.GetContent(_, keyOrIndex)
+		local i = GetIndex(keyOrIndex)
+		return i and tabs[i] and tabs[i].Content
+	end
+
+	function controller.GetTabButton(_, keyOrIndex)
+		local i = GetIndex(keyOrIndex)
+		return i and tabs[i] and tabs[i].Button
+	end
+
+	function controller.Select(_, keyOrIndex)
+		local i = GetIndex(keyOrIndex)
+		if not i or not tabs[i] then
+			return
+		end
+
+		selectedKey = tabs[i].Key
+
+		for j = 1, #tabs do
+			local isSel = (j == i)
+			tabs[j].Content:SetShown(isSel)
+			SetSelected(tabs[j].Button, isSel)
+		end
+
+		if options.OnTabChanged then
+			options.OnTabChanged(selectedKey, i)
+		end
+	end
+
+	controller.Tabs = tabs
+
+	local prev
+	for i, def in ipairs(options.Tabs) do
+		assert(def.Key and def.Key ~= "", "CreateTabs: each tab needs Key")
+		assert(not keyToIndex[def.Key], "CreateTabs: duplicate Key: " .. def.Key)
+
+		local btn = CreateFrame("Button", nil, strip, "BackdropTemplate")
+		btn:SetHeight(tabHeight)
+		btn:SetBackdrop({
+			bgFile = "Interface\\Buttons\\WHITE8X8",
+			edgeFile = "Interface\\Buttons\\WHITE8X8",
+			edgeSize = 1,
+		})
+
+		btn.Text = btn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+		btn.Text:SetPoint("CENTER", btn, "CENTER", 0, 0)
+		btn.Text:SetText(def.Title or def.Key)
+
+		btn.Highlight = btn:CreateTexture(nil, "HIGHLIGHT")
+		btn.Highlight:SetAllPoints(btn)
+		btn.Highlight:SetColorTexture(1, 1, 1, 1)
+
+		SizeToText(btn)
+
+		if not prev then
+			btn:SetPoint("BOTTOMLEFT", strip, "BOTTOMLEFT", 0, 1)
+		else
+			btn:SetPoint("LEFT", prev, "RIGHT", tabSpacing, 0)
+		end
+
+		prev = btn
+
+		local content = CreateFrame("Frame", nil, body)
+		content:SetAllPoints(body)
+		content:Hide()
+
+		local tab = { Key = def.Key, Title = def.Title or def.Key, Button = btn, Content = content }
+		tabs[i] = tab
+		keyToIndex[def.Key] = i
+
+		btn:SetScript("OnClick", function()
+			controller:Select(i)
+		end)
+
+		if type(def.Build) == "function" then
+			def.Build(content)
+		end
+	end
+
+	local initialIndex = 1
+	if options.InitialKey and keyToIndex[options.InitialKey] then
+		initialIndex = keyToIndex[options.InitialKey]
+	end
+
+	for i = 1, #tabs do
+		local isSel = (i == initialIndex)
+		tabs[i].Content:SetShown(isSel)
+		SetSelected(tabs[i].Button, isSel)
+	end
+	selectedKey = tabs[initialIndex].Key
+
+	if options.OnTabChanged then
+		options.OnTabChanged(selectedKey, initialIndex)
+	end
+
+	return controller
+end
+
 function M:ShowDialog(options)
 	if not options then
 		error("ShowDialog - options must not be nil.")
@@ -780,16 +1242,20 @@ function M:ShowDialog(options)
 
 	local dlg = GetOrCreateDialog()
 
-	if options.Width then
-		dlg:SetWidth(options.Width)
-	end
+	-- Width must be known first
+	local width = options.Width or 360
+	dlg:SetWidth(width)
 
-	if options.Height then
-		dlg:SetHeight(options.Height)
-	end
-
+	dlg.Title:SetText(options.Title or "Notification")
+	dlg.Text:SetWidth(width - 40)
 	dlg.Text:SetText(options.Text)
+	dlg.Text:SetWordWrap(true)
 
+	local textHeight = dlg.Text:GetStringHeight()
+	local paddingTop = 70
+	local paddingBottom = 40
+
+	dlg:SetHeight(textHeight + paddingTop + paddingBottom)
 	dlg:ClearAllPoints()
 	dlg:SetPoint("CENTER", UIParent, "CENTER")
 	dlg:Show()
@@ -872,6 +1338,19 @@ function M:GetSavedVars(defaults)
 	return vars
 end
 
+function M:GetCharacterSavedVars(defaults)
+	local name = addonName .. "CharDB"
+	local vars = _G[name] or {}
+
+	_G[name] = vars
+
+	if defaults then
+		return M:CopyTable(defaults, vars)
+	end
+
+	return vars
+end
+
 function M:ResetSavedVars(defaults)
 	local name = addonName .. "DB"
 	local vars = _G[name] or {}
@@ -890,7 +1369,7 @@ end
 ---Removes any erronous values from the options table.
 ---@param target table the target table to clean
 ---@param template table what the table should look like
----@param cleanValues any whether or not to clean non-table values, e.g. numbers and strings
+---@param cleanValues any whether or not to clean values (both table and non-table)
 ---@param recurse any whether to recursively clean the table
 function M:CleanTable(target, template, cleanValues, recurse)
 	-- remove values that aren't ours
@@ -901,18 +1380,15 @@ function M:CleanTable(target, template, cleanValues, recurse)
 	for key, value in pairs(target) do
 		local templateValue = template[key]
 
-		-- only clean non-table values if told to do so
+		-- Remove unknown keys or keys with wrong types when cleanValues is true
 		if cleanValues and templateValue == nil then
 			target[key] = nil
-		end
-
-		if recurse then
-			if type(value) == "table" and type(templateValue) == "table" then
-				M:CleanTable(value, templateValue, cleanValues, recurse)
-			elseif type(value) == "table" and type(templateValue) ~= "table" then
-				-- type mismatch: reset this key to default
-				target[key] = templateValue
-			end
+		elseif cleanValues and type(value) == "table" and type(templateValue) ~= "table" then
+			-- type mismatch: reset this key to default
+			target[key] = templateValue
+		elseif recurse and type(value) == "table" and type(templateValue) == "table" then
+			-- Recursively clean nested tables
+			M:CleanTable(value, templateValue, cleanValues, recurse)
 		end
 	end
 end
@@ -955,31 +1431,31 @@ loader:SetScript("OnEvent", OnAddonLoaded)
 ---@field Tooltip string?
 ---@field Numeric boolean?
 ---@field AllowNegatives boolean?
----@field MultiLine boolean?
 ---@field Width number?
 ---@field Height number?
 ---@field Readonly boolean?
+---@field MultiLine boolean?
 ---@field GetValue fun(): string|number
----@field SetValue? fun(value: string|number)
+---@field SetValue fun(value: string|number)
 
 ---@class EditBoxReturn
 ---@field EditBox table
 ---@field Label table
 
----@class DropdownReturn
----@field Dropdown table
----@field Modern boolean true if used a modern dropdown, otherwise false
----@field Label table
-
 ---@class DropdownOptions
 ---@field Parent table
----@field LabelText? string
----@field Width number
 ---@field Items any[]
+---@field Width number?
 ---@field Tooltip string?
+---@field LabelText string?
 ---@field GetValue fun(): string
 ---@field SetValue fun(value: string)
 ---@field GetText? fun(value: any): string
+
+---@class DropdownReturn
+---@field Dropdown table
+---@field Label table
+---@field Modern boolean
 
 ---@class SliderOptions
 ---@field Parent table
@@ -993,6 +1469,7 @@ loader:SetScript("OnEvent", OnAddonLoaded)
 ---@field SetValue fun(value: number)
 
 ---@class SliderReturn
+---@field Container table
 ---@field Label table
 ---@field EditBox table
 ---@field Slider table
@@ -1009,6 +1486,7 @@ loader:SetScript("OnEvent", OnAddonLoaded)
 ---@field VerticalSpacing number?
 
 ---@class DialogOptions
+---@field Title string
 ---@field Text string
 ---@field Width number?
 ---@field Height number?
@@ -1016,3 +1494,61 @@ loader:SetScript("OnEvent", OnAddonLoaded)
 ---@class DividerOptions
 ---@field Parent table
 ---@field Text string
+
+---@class ListOptions
+---@field Parent table
+---@field RowGap number?
+---@field RowWidth number
+---@field RowHeight number
+---@field RemoveButtonWidth number?
+---@field OnRemove fun(item: any)
+
+---@class ListReturn
+---@field ScrollFrame table
+---@field Content table
+---@field Add fun(self: table, item: any)
+---@field SetItems fun(self: table, items: table)
+---@field GetItems fun(self: table): table
+
+---@class Tab
+---@field Key string
+---@field Title string
+---@field Build? fun(content:table)
+
+---@class TabOptions
+---@field Parent table
+---@field Tabs Tab[]
+---@field InitialKey? string
+---@field TabHeight? number
+---@field TabMinWidth? number
+---@field TabSpacing? number
+---@field StripHeight? number
+---@field ContentInsets? table
+---@field OnTabChanged? fun(key:string, index:number)
+
+---@class TabReturn
+---@field Select fun(keyOrIndex: string|number)
+---@field GetSelected fun(): string
+---@field GetContent fun(self: table, keyOrIndex: string|number): table?
+---@field GetTabButton fun(self: table, keyOrIndex: string|number): table?
+---@field Tabs Tab[]
+
+---@class Insets
+---@field Top number?
+---@field Left number?
+---@field Right number?
+---@field Bottom number?
+
+---@class TextLine
+---@field Prefix string
+---@field Suffix string
+---@field Text string
+
+---@class TextBlockSegmentedOptions
+---@field Parent table
+---@field Lines (string|TextLine)[]
+---@field PrefixFont? string|table
+---@field TextFont?  string|table
+---@field SuffixFont? string|table
+---@field VerticalSpacing? number
+---@field SegmentSpacing? number

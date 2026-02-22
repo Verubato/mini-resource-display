@@ -239,11 +239,23 @@ local function UpdateHealth()
 	healthBar:SetValue(hp, smoothing)
 
 	if db.ShowText then
-		local format = db.HealthTextFormat or "%s/%s"
-		local currentHpAbbreviated = AbbreviateNumbers(hp)
-		local maxHpAbbreviated = AbbreviateNumbers(max)
+		if db.UsePercent then
+			local pct = 0
+			if type(UnitHealthPercent) == "function" then
+				pct = UnitHealthPercent("player", true, (CurveConstants and CurveConstants.ScaleTo100))
+			else
+				if max > 0 then
+					pct = math.floor((hp / max) * 100 + 0.5)
+				end
+			end
+			healthText:SetText(string.format("%d%%", pct))
+		else
+			local format = db.HealthTextFormat or "%s/%s"
+			local currentHpAbbreviated = AbbreviateNumbers(hp)
+			local maxHpAbbreviated = AbbreviateNumbers(max)
 
-		healthText:SetText(string.format(format, currentHpAbbreviated, maxHpAbbreviated))
+			healthText:SetText(string.format(format, currentHpAbbreviated, maxHpAbbreviated))
+		end
 	end
 end
 
@@ -288,11 +300,23 @@ local function UpdatePower()
 	SetBarColor(powerBar, r, g, b)
 
 	if db.ShowText then
-		local format = db.PowerTextFormat or "%s/%s"
-		local currentPowerAbbreviated = AbbreviateNumbers(power)
-		local maxPowerAbbreviated = AbbreviateNumbers(max)
+		if db.UsePercent then
+			local pct = 0
+			if type(UnitPowerPercent) == "function" then
+				pct = UnitPowerPercent("player", powerType, true, (CurveConstants and CurveConstants.ScaleTo100))
+			else
+				if max > 0 then
+					pct = math.floor((power / max) * 100 + 0.5)
+				end
+			end
+			powerText:SetText(string.format("%d%%", pct))
+		else
+			local format = db.PowerTextFormat or "%s/%s"
+			local currentPowerAbbreviated = AbbreviateNumbers(power)
+			local maxPowerAbbreviated = AbbreviateNumbers(max)
 
-		powerText:SetText(string.format(format, currentPowerAbbreviated, maxPowerAbbreviated))
+			powerText:SetText(string.format(format, currentPowerAbbreviated, maxPowerAbbreviated))
+		end
 	end
 end
 

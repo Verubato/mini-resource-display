@@ -39,6 +39,8 @@ local dbDefaults = {
 
 	AlwaysShow = false,
 
+	UsePercent = false,
+
 	FadeInDuration = 1,
 	FadeOutDuration = 1,
 
@@ -180,12 +182,27 @@ function M:Init()
 	showPower:SetPoint("LEFT", showHealth, "RIGHT", columnStep, 0)
 	useClassColor:SetPoint("LEFT", showPower, "RIGHT", columnStep, 0)
 
+	local usePercent = mini:Checkbox({
+		Parent = panel,
+		LabelText = "Show percent",
+		Tooltip = "Show health and power as percentage when text is enabled.",
+		GetValue = function()
+			return db.UsePercent
+		end,
+		SetValue = function(value)
+			db.UsePercent = value
+			addon:Reload()
+		end,
+	})
+
+	usePercent:SetPoint("TOPLEFT", showHealth, "BOTTOMLEFT", 0, -verticalSpacing / 2)
+
 	local sizeDivider = mini:Divider({
 		Parent = panel,
 		Text = "Size",
 	})
 
-	sizeDivider:SetPoint("TOP", showHealth, "BOTTOM", 0, -verticalSpacing)
+	sizeDivider:SetPoint("TOP", usePercent, "BOTTOM", 0, -verticalSpacing)
 	sizeDivider:SetPoint("LEFT", panel, "LEFT")
 	sizeDivider:SetPoint("RIGHT", panel, "RIGHT", -horizontalSpacing, 0)
 

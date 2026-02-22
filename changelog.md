@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.5.0
+
+- Added option to show/hide health and mana bars.
+- Added class coloured health bar option.
+- Both of these changes came from CurseForge user dblg, so credit goes to them.
+
 ## 1.4.0
 
 - Added background to the bars so they aren't see through.

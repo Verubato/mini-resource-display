@@ -1,5 +1,5 @@
 local addonName, addon = ...
-local LSM = LibStub and LibStub("LibSharedMedia-3.0", false)
+local LSM = LibStub and LibStub("LibSharedMedia-3.0", true)
 ---@type MiniFramework
 local mini = addon.Framework
 ---@type Db
@@ -19,6 +19,10 @@ local dbDefaults = {
 
 	Gap = 0,
 	Padding = 2,
+
+	ShowHealth = true,
+	ShowPower = true,
+	UseClassColorHealth = false,
 
 	ShowText = true,
 	Font = "Fonts\\FRIZQT__.TTF",
@@ -131,14 +135,57 @@ function M:Init()
 		end,
 	})
 
+	local showHealth = mini:Checkbox({
+		Parent = panel,
+		LabelText = "Show health bar",
+		Tooltip = "Whether to show the health bar.",
+		GetValue = function()
+			return db.ShowHealth
+		end,
+		SetValue = function(value)
+			db.ShowHealth = value
+			addon:Reload()
+		end,
+	})
+
+	local showPower = mini:Checkbox({
+		Parent = panel,
+		LabelText = "Show power bar",
+		Tooltip = "Whether to show the power/mana bar.",
+		GetValue = function()
+			return db.ShowPower
+		end,
+		SetValue = function(value)
+			db.ShowPower = value
+			addon:Reload()
+		end,
+	})
+
+	local useClassColor = mini:Checkbox({
+		Parent = panel,
+		LabelText = "Class color health",
+		Tooltip = "Use your class color for the health bar.",
+		GetValue = function()
+			return db.UseClassColorHealth
+		end,
+		SetValue = function(value)
+			db.UseClassColorHealth = value
+			addon:Reload()
+		end,
+	})
+
 	showText:SetPoint("LEFT", alwaysShowChk, "RIGHT", columnStep, 0)
+
+	showHealth:SetPoint("TOPLEFT", locked, "BOTTOMLEFT", 0, -verticalSpacing / 2)
+	showPower:SetPoint("LEFT", showHealth, "RIGHT", columnStep, 0)
+	useClassColor:SetPoint("LEFT", showPower, "RIGHT", columnStep, 0)
 
 	local sizeDivider = mini:Divider({
 		Parent = panel,
 		Text = "Size",
 	})
 
-	sizeDivider:SetPoint("TOP", locked, "BOTTOM", 0, -verticalSpacing)
+	sizeDivider:SetPoint("TOP", showHealth, "BOTTOM", 0, -verticalSpacing)
 	sizeDivider:SetPoint("LEFT", panel, "LEFT")
 	sizeDivider:SetPoint("RIGHT", panel, "RIGHT", -horizontalSpacing, 0)
 

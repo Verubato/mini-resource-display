@@ -170,25 +170,52 @@ local function UpdateSizes()
 	local gap = db.Gap or 0
 	local w = db.Width or 150
 	local h = db.Height or 15
+	local showHealth = (db.ShowHealth ~= false)
+	local showPower = (db.ShowPower ~= false)
 
-	local totalWidth = w + pad * 2
-	local totalHeight = (h * 2) + gap + pad * 2
+	local bars = 0
+	if showHealth then
+		bars = bars + 1
+	end
+	if showPower then
+		bars = bars + 1
+	end
 
-	container:SetSize(totalWidth, totalHeight)
+	if bars > 0 then
+		local totalWidth = w + pad * 2
+		local totalHeight = (h * bars) + ((bars == 2) and gap or 0) + pad * 2
+
+		container:SetSize(totalWidth, totalHeight)
+		container:Show()
+	else
+		container:Hide()
+	end
 
 	healthBar:ClearAllPoints()
-	healthBar:SetPoint("TOPLEFT", container, "TOPLEFT", pad, -pad)
-	healthBar:SetPoint("TOPRIGHT", container, "TOPRIGHT", -pad, -pad)
-	healthBar:SetHeight(h)
-
 	powerBar:ClearAllPoints()
-	powerBar:SetPoint("TOPLEFT", healthBar, "BOTTOMLEFT", 0, -gap)
-	powerBar:SetPoint("TOPRIGHT", healthBar, "BOTTOMRIGHT", 0, -gap)
+
+	healthBar:SetHeight(h)
 	powerBar:SetHeight(h)
 
+	healthBar:SetShown(showHealth)
+	powerBar:SetShown(showPower)
+
+	if showHealth then
+		healthBar:SetPoint("TOPLEFT", container, "TOPLEFT", pad, -pad)
+		healthBar:SetPoint("TOPRIGHT", container, "TOPRIGHT", -pad, -pad)
+	end
+
+	if showHealth and showPower then
+		powerBar:SetPoint("TOPLEFT", healthBar, "BOTTOMLEFT", 0, -gap)
+		powerBar:SetPoint("TOPRIGHT", healthBar, "BOTTOMRIGHT", 0, -gap)
+	elseif showPower then
+		powerBar:SetPoint("TOPLEFT", container, "TOPLEFT", pad, -pad)
+		powerBar:SetPoint("TOPRIGHT", container, "TOPRIGHT", -pad, -pad)
+	end
+
 	if db.ShowText then
-		healthText:Show()
-		powerText:Show()
+		healthText:SetShown(showHealth)
+		powerText:SetShown(showPower)
 	else
 		healthText:Hide()
 		powerText:Hide()
@@ -257,14 +284,25 @@ local function UpdatePower()
 end
 
 local function UpdateColors()
-	local hr = (db.HealthColor and db.HealthColor[1]) or 0
-	local hg = (db.HealthColor and db.HealthColor[2]) or 1
-	local hb = (db.HealthColor and db.HealthColor[3]) or 0
+	local hr, hg, hb
+
+	if db.UseClassColorHealth then
+		local _, class = UnitClass("player")
+		local c = class and RAID_CLASS_COLORS and RAID_CLASS_COLORS[class]
+		if c then
+			hr, hg, hb = c.r, c.g, c.b
+		end
+	end
+
+	if not hr then
+		hr = (db.HealthColor and db.HealthColor[1]) or 0
+		hg = (db.HealthColor and db.HealthColor[2]) or 1
+		hb = (db.HealthColor and db.HealthColor[3]) or 0
+	end
 
 	SetBarColor(healthBar, hr, hg, hb)
 
 	local r, g, b = GetPowerColor()
-
 	SetBarColor(powerBar, r, g, b)
 end
 

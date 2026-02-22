@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.6.0
+
+- Added shield absorb overlay.
+- Added percentage text option.
+
 ## 1.5.0
 
 - Added option to show/hide health and mana bars.

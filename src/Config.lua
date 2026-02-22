@@ -122,7 +122,8 @@ function M:Init()
 		end,
 	})
 
-	alwaysShowChk:SetPoint("LEFT", locked, "RIGHT", columnStep, 0)
+	alwaysShowChk:SetPoint("TOP", locked, "TOP", 0, 0)
+	alwaysShowChk:SetPoint("LEFT", panel, "LEFT", columnStep, 0)
 
 	local showText = mini:Checkbox({
 		Parent = panel,
@@ -137,6 +138,25 @@ function M:Init()
 		end,
 	})
 
+	showText:SetPoint("TOP", locked, "TOP", 0, 0)
+	showText:SetPoint("LEFT", panel, "LEFT", columnStep * 2, 0)
+
+	local usePercent = mini:Checkbox({
+		Parent = panel,
+		LabelText = "Percentages",
+		Tooltip = "Show health and power as percentage when text is enabled.",
+		GetValue = function()
+			return db.UsePercent
+		end,
+		SetValue = function(value)
+			db.UsePercent = value
+			addon:Reload()
+		end,
+	})
+
+	usePercent:SetPoint("TOP", locked, "TOP", 0, 0)
+	usePercent:SetPoint("LEFT", panel, "LEFT", columnStep * 3, 0)
+
 	local showHealth = mini:Checkbox({
 		Parent = panel,
 		LabelText = "Show health bar",
@@ -149,6 +169,8 @@ function M:Init()
 			addon:Reload()
 		end,
 	})
+
+	showHealth:SetPoint("TOPLEFT", locked, "BOTTOMLEFT", 0, -verticalSpacing)
 
 	local showPower = mini:Checkbox({
 		Parent = panel,
@@ -163,6 +185,9 @@ function M:Init()
 		end,
 	})
 
+	showPower:SetPoint("TOP", showHealth, "TOP", 0, 0)
+	showPower:SetPoint("LEFT", panel, "LEFT", columnStep, 0)
+
 	local useClassColor = mini:Checkbox({
 		Parent = panel,
 		LabelText = "Class color health",
@@ -176,33 +201,15 @@ function M:Init()
 		end,
 	})
 
-	showText:SetPoint("LEFT", alwaysShowChk, "RIGHT", columnStep, 0)
-
-	showHealth:SetPoint("TOPLEFT", locked, "BOTTOMLEFT", 0, -verticalSpacing / 2)
-	showPower:SetPoint("LEFT", showHealth, "RIGHT", columnStep, 0)
-	useClassColor:SetPoint("LEFT", showPower, "RIGHT", columnStep, 0)
-
-	local usePercent = mini:Checkbox({
-		Parent = panel,
-		LabelText = "Show percent",
-		Tooltip = "Show health and power as percentage when text is enabled.",
-		GetValue = function()
-			return db.UsePercent
-		end,
-		SetValue = function(value)
-			db.UsePercent = value
-			addon:Reload()
-		end,
-	})
-
-	usePercent:SetPoint("TOPLEFT", showHealth, "BOTTOMLEFT", 0, -verticalSpacing / 2)
+	useClassColor:SetPoint("TOP", showHealth, "TOP", 0, 0)
+	useClassColor:SetPoint("LEFT", panel, "LEFT", columnStep * 2, 0)
 
 	local sizeDivider = mini:Divider({
 		Parent = panel,
 		Text = "Size",
 	})
 
-	sizeDivider:SetPoint("TOP", usePercent, "BOTTOM", 0, -verticalSpacing)
+	sizeDivider:SetPoint("TOP", showHealth, "BOTTOM", 0, -verticalSpacing)
 	sizeDivider:SetPoint("LEFT", panel, "LEFT")
 	sizeDivider:SetPoint("RIGHT", panel, "RIGHT", -horizontalSpacing, 0)
 

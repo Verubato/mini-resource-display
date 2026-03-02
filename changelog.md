@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.7.0
+
+- Improved shield absorb overlay so it shows undershields not just overshields.
+- Made the shield absorb texture easier to see.
+
 ## 1.6.0
 
 - Added shield absorb overlay.

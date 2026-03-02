@@ -6,7 +6,9 @@ local eventsFrame
 local container
 local healthBar
 local powerBar
-local absorbBar
+local overshieldBar
+local regularAbsorbBar
+local healPredictionCalc
 local healthText
 local powerText
 local fallbackTexture = "Interface\\TARGETINGFRAME\\UI-StatusBar"
@@ -231,6 +233,41 @@ local function UpdateSizes()
 	end
 end
 
+local function UpdateAbsorb()
+	if not overshieldBar then
+		return
+	end
+
+	local maxHealth = UnitHealthMax("player") or 0
+	local totalAbsorbs = UnitGetTotalAbsorbs("player") or 0
+
+	overshieldBar:SetMinMaxValues(0, maxHealth)
+	overshieldBar:SetValue(totalAbsorbs)
+
+	if regularAbsorbBar then
+		if healPredictionCalc and UnitGetDetailedHealPrediction then
+			-- Midnight+: use calculator to avoid secret value arithmetic
+			UnitGetDetailedHealPrediction("player", nil, healPredictionCalc)
+			local absorbAmount, clamped = healPredictionCalc:GetDamageAbsorbs()
+			local missingHealth = healPredictionCalc:GetMissingHealth()
+			regularAbsorbBar:SetMinMaxValues(0, missingHealth)
+			regularAbsorbBar:SetValue(absorbAmount or 0)
+			regularAbsorbBar:SetAlphaFromBoolean(clamped, 0, 1)
+			overshieldBar:SetAlphaFromBoolean(clamped, 1, 0)
+		else
+			-- Legacy: values are non-secret numbers, direct math is safe
+			local hp = UnitHealth("player") or 0
+			local remaining = math.max(0, maxHealth - hp)
+			local cappedAbsorb = math.min(totalAbsorbs, remaining)
+			local hasOvershield = totalAbsorbs > remaining
+			regularAbsorbBar:SetMinMaxValues(0, remaining)
+			regularAbsorbBar:SetValue(cappedAbsorb)
+			regularAbsorbBar:SetAlpha(hasOvershield and 0 or 1)
+			overshieldBar:SetAlpha(hasOvershield and 1 or 0)
+		end
+	end
+end
+
 local function UpdateHealth()
 	local hp = UnitHealth("player") or 0
 	local max = UnitHealthMax("player") or 1
@@ -257,18 +294,8 @@ local function UpdateHealth()
 			healthText:SetText(string.format(format, currentHpAbbreviated, maxHpAbbreviated))
 		end
 	end
-end
 
-local function UpdateAbsorb()
-	if not absorbBar then
-		return
-	end
-
-	local maxHealth = UnitHealthMax("player") or 0
-	local totalAbsorbs = UnitGetTotalAbsorbs("player") or 0
-
-	absorbBar:SetMinMaxValues(0, maxHealth)
-	absorbBar:SetValue(totalAbsorbs)
+	UpdateAbsorb()
 end
 
 local function GetPowerColor()
@@ -339,6 +366,14 @@ local function UpdateColors()
 
 	SetBarColor(healthBar, hr, hg, hb)
 
+	if regularAbsorbBar and regularAbsorbBar.Background then
+		regularAbsorbBar.Background:SetVertexColor(hr, hg, hb, 1)
+	end
+
+	if overshieldBar and overshieldBar.Background then
+		overshieldBar.Background:SetVertexColor(hr, hg, hb, 1)
+	end
+
 	local r, g, b = GetPowerColor()
 	SetBarColor(powerBar, r, g, b)
 end
@@ -376,6 +411,14 @@ local function UpdateTextures()
 
 	if texture and powerBar.Background then
 		powerBar.Background:SetTexture(texture)
+	end
+
+	if texture and regularAbsorbBar and regularAbsorbBar.Background then
+		regularAbsorbBar.Background:SetTexture(texture)
+	end
+
+	if texture and overshieldBar and overshieldBar.Background then
+		overshieldBar.Background:SetTexture(texture)
 	end
 end
 
@@ -417,43 +460,82 @@ local function Load()
 	healthBar = CreateFrame("StatusBar", nil, container)
 	healthBar.Background = CreateBackground(healthBar)
 
-	absorbBar = CreateFrame("StatusBar", nil, container)
-	absorbBar:SetAllPoints(healthBar)
-	absorbBar:SetReverseFill(true)
-	absorbBar:SetStatusBarTexture("Interface\\RaidFrame\\Shield-Overlay")
+	regularAbsorbBar = CreateFrame("StatusBar", nil, container)
+	regularAbsorbBar:SetStatusBarTexture("Interface\\RaidFrame\\Shield-Overlay")
 
-	local absTex = absorbBar:GetStatusBarTexture()
+	local regAbsTex = regularAbsorbBar:GetStatusBarTexture()
+	if regAbsTex then
+		regAbsTex:SetTexture("Interface\\RaidFrame\\Shield-Overlay", "REPEAT", "REPEAT")
+		regAbsTex:SetHorizTile(true)
+		regAbsTex:SetVertTile(true)
+		regAbsTex:SetDrawLayer("ARTWORK", 1)
+		regAbsTex:SetDesaturated(true)
+
+		-- Background anchored to the fill texture's right so it only covers the absorb region
+		regularAbsorbBar.Background = regularAbsorbBar:CreateTexture(nil, "BACKGROUND")
+		regularAbsorbBar.Background:SetPoint("TOPLEFT", regularAbsorbBar, "TOPLEFT", 0, 0)
+		regularAbsorbBar.Background:SetPoint("BOTTOMRIGHT", regAbsTex, "BOTTOMRIGHT", 0, 0)
+	end
+
+	regularAbsorbBar:SetStatusBarColor(1, 1, 1, 1)
+
+	overshieldBar = CreateFrame("StatusBar", nil, container)
+	overshieldBar:SetAllPoints(healthBar)
+	overshieldBar:SetReverseFill(true)
+	overshieldBar:SetStatusBarTexture("Interface\\RaidFrame\\Shield-Overlay")
+
+	local absTex = overshieldBar:GetStatusBarTexture()
 	if absTex then
 		absTex:SetTexture("Interface\\RaidFrame\\Shield-Overlay", "REPEAT", "REPEAT")
 		absTex:SetHorizTile(true)
 		absTex:SetVertTile(true)
 		absTex:SetDrawLayer("ARTWORK", 1)
 		absTex:SetDesaturated(true)
+
+		-- Background anchored to the fill texture's left so it only covers the overshield region
+		overshieldBar.Background = overshieldBar:CreateTexture(nil, "BACKGROUND")
+		overshieldBar.Background:SetPoint("TOPRIGHT", overshieldBar, "TOPRIGHT", 0, 0)
+		overshieldBar.Background:SetPoint("BOTTOMLEFT", absTex, "BOTTOMLEFT", 0, 0)
 	end
 
 	-- frame level will be set after baseLevel is calculated so it matches other bars
-	absorbBar:SetStatusBarColor(1, 1, 1, 1)
+	overshieldBar:SetStatusBarColor(1, 1, 1, 1)
 
 	powerBar = CreateFrame("StatusBar", nil, container)
 	powerBar.Background = CreateBackground(powerBar)
 
 	UpdateTextures()
 
+	-- Anchor the regular absorb bar to the right edge of the health bar fill texture.
+	-- As health changes the fill texture resizes, so this automatically tracks health end.
+	regularAbsorbBar:SetPoint("TOPLEFT", healthBar:GetStatusBarTexture(), "TOPRIGHT", 0, 0)
+	regularAbsorbBar:SetPoint("BOTTOMRIGHT", healthBar, "BOTTOMRIGHT", 0, 0)
+
+	if CreateUnitHealPredictionCalculator then
+		healPredictionCalc = CreateUnitHealPredictionCalculator()
+		healPredictionCalc:SetDamageAbsorbClampMode(Enum.UnitDamageAbsorbClampMode.MissingHealth)
+	end
+
 	local baseLevel = container:GetFrameLevel() or 0
 	healthBar:SetFrameLevel(baseLevel + 1)
 	powerBar:SetFrameLevel(baseLevel + 1)
-	-- ensure absorb bar draws with the bars but not above them
-	absorbBar:SetFrameLevel(baseLevel + 1)
+	-- Must be above healthBar so its background isn't covered by healthBar's dark background
+	overshieldBar:SetFrameLevel(baseLevel + 2)
+	regularAbsorbBar:SetFrameLevel(baseLevel + 2)
 
 	if db.Border then
 		healthBar.Outline = AddBlackOutline(healthBar)
 		powerBar.Outline = AddBlackOutline(powerBar)
 	end
 
-	healthText = healthBar:CreateFontString(nil, "OVERLAY")
+	-- Text frame above all bars so font strings aren't covered by regularAbsorbBar
+	local textFrame = CreateFrame("Frame", nil, container)
+	textFrame:SetFrameLevel(baseLevel + 3)
+
+	healthText = textFrame:CreateFontString(nil, "OVERLAY")
 	healthText:SetPoint("CENTER", healthBar, "CENTER", 0, 0)
 
-	powerText = powerBar:CreateFontString(nil, "OVERLAY")
+	powerText = textFrame:CreateFontString(nil, "OVERLAY")
 	powerText:SetPoint("CENTER", powerBar, "CENTER", 0, 0)
 
 	UpdateFonts()

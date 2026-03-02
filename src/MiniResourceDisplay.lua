@@ -421,8 +421,6 @@ local function Load()
 	absorbBar:SetAllPoints(healthBar)
 	absorbBar:SetReverseFill(true)
 	absorbBar:SetStatusBarTexture("Interface\\RaidFrame\\Shield-Overlay")
-	-- frame level will be set after baseLevel is calculated so it matches other bars
-	absorbBar:SetStatusBarColor(1, 1, 1, 0.5)
 
 	local absTex = absorbBar:GetStatusBarTexture()
 	if absTex then
@@ -430,7 +428,11 @@ local function Load()
 		absTex:SetHorizTile(true)
 		absTex:SetVertTile(true)
 		absTex:SetDrawLayer("ARTWORK", 1)
+		absTex:SetDesaturated(true)
 	end
+
+	-- frame level will be set after baseLevel is calculated so it matches other bars
+	absorbBar:SetStatusBarColor(1, 1, 1, 1)
 
 	powerBar = CreateFrame("StatusBar", nil, container)
 	powerBar.Background = CreateBackground(powerBar)

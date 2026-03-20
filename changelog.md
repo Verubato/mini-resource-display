@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.7.1
+
+Fixed textures not applying on load when they are sourced from other addons.
+
 ## 1.7.0
 
 - Improved shield absorb overlay so it shows undershields not just overshields.

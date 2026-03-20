@@ -584,30 +584,42 @@ local function OnAddonLoaded()
 
 	db = mini:GetSavedVars()
 
-	Load()
+	-- Wait for PLAYER_ENTERING_WORLD so other addons have had time to register
+	-- their textures with LSM, then defer one frame tick to catch any that
+	-- register during the same event cycle.
+	local initFrame = CreateFrame("Frame")
+	initFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
+	initFrame:SetScript("OnEvent", function(self)
+		self:UnregisterAllEvents()
+		self:SetScript("OnEvent", nil)
 
-	eventsFrame = CreateFrame("Frame")
-	eventsFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
-	eventsFrame:RegisterEvent("PLAYER_REGEN_DISABLED")
-	eventsFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
+		C_Timer.After(0, function()
+			Load()
 
-	if eventsFrame.RegisterUnitEvent then
-		eventsFrame:RegisterUnitEvent("UNIT_HEALTH", "player")
-		eventsFrame:RegisterUnitEvent("UNIT_POWER_UPDATE", "player")
-		eventsFrame:RegisterUnitEvent("UNIT_POWER_FREQUENT", "player")
-		eventsFrame:RegisterUnitEvent("UNIT_DISPLAYPOWER", "player")
-		eventsFrame:RegisterUnitEvent("UNIT_ABSORB_AMOUNT_CHANGED", "player")
-		eventsFrame:RegisterUnitEvent("UNIT_HEAL_ABSORB_AMOUNT_CHANGED", "player")
-	else
-		eventsFrame:RegisterEvent("UNIT_HEALTH")
-		eventsFrame:RegisterEvent("UNIT_POWER_UPDATE")
-		eventsFrame:RegisterEvent("UNIT_POWER_FREQUENT")
-		eventsFrame:RegisterEvent("UNIT_DISPLAYPOWER")
-		eventsFrame:RegisterEvent("UNIT_ABSORB_AMOUNT_CHANGED")
-		eventsFrame:RegisterEvent("UNIT_HEAL_ABSORB_AMOUNT_CHANGED")
-	end
+			eventsFrame = CreateFrame("Frame")
+			eventsFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
+			eventsFrame:RegisterEvent("PLAYER_REGEN_DISABLED")
+			eventsFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
 
-	eventsFrame:SetScript("OnEvent", OnEvent)
+			if eventsFrame.RegisterUnitEvent then
+				eventsFrame:RegisterUnitEvent("UNIT_HEALTH", "player")
+				eventsFrame:RegisterUnitEvent("UNIT_POWER_UPDATE", "player")
+				eventsFrame:RegisterUnitEvent("UNIT_POWER_FREQUENT", "player")
+				eventsFrame:RegisterUnitEvent("UNIT_DISPLAYPOWER", "player")
+				eventsFrame:RegisterUnitEvent("UNIT_ABSORB_AMOUNT_CHANGED", "player")
+				eventsFrame:RegisterUnitEvent("UNIT_HEAL_ABSORB_AMOUNT_CHANGED", "player")
+			else
+				eventsFrame:RegisterEvent("UNIT_HEALTH")
+				eventsFrame:RegisterEvent("UNIT_POWER_UPDATE")
+				eventsFrame:RegisterEvent("UNIT_POWER_FREQUENT")
+				eventsFrame:RegisterEvent("UNIT_DISPLAYPOWER")
+				eventsFrame:RegisterEvent("UNIT_ABSORB_AMOUNT_CHANGED")
+				eventsFrame:RegisterEvent("UNIT_HEAL_ABSORB_AMOUNT_CHANGED")
+			end
+
+			eventsFrame:SetScript("OnEvent", OnEvent)
+		end)
+	end)
 end
 
 function addon:Reload()

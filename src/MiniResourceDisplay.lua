@@ -306,7 +306,6 @@ local function CreateBarGroup(unit, containerName, hasPower, getPositionDb, save
 		local totalAbsorbs = UnitGetTotalAbsorbs(self.unit) or 0
 
 		self.overshieldBar:SetMinMaxValues(0, maxHealth)
-		self.overshieldBar:SetValue(totalAbsorbs)
 
 		if self.regularAbsorbBar then
 			if self.healPredictionCalc and UnitGetDetailedHealPrediction then
@@ -316,8 +315,10 @@ local function CreateBarGroup(unit, containerName, hasPower, getPositionDb, save
 				local missingHealth = self.healPredictionCalc:GetMissingHealth()
 				self.regularAbsorbBar:SetMinMaxValues(0, missingHealth)
 				self.regularAbsorbBar:SetValue(absorbAmount or 0)
-				self.regularAbsorbBar:SetAlphaFromBoolean(clamped, 0, 1)
 				local overshieldOpacity = (db.Overshield and db.Overshield.Opacity) or 1
+				self.regularAbsorbBar:SetAlphaFromBoolean(clamped, 0, overshieldOpacity)
+				if self.absorbZoneBgFrame then self.absorbZoneBgFrame:SetAlphaFromBoolean(clamped, 0, 1) end
+				self.overshieldBar:SetValue(totalAbsorbs)
 				self.overshieldBar:SetAlphaFromBoolean(clamped, overshieldOpacity, 0)
 			else
 				-- Legacy: values are non-secret numbers, direct math is safe
@@ -327,8 +328,10 @@ local function CreateBarGroup(unit, containerName, hasPower, getPositionDb, save
 				local hasOvershield = totalAbsorbs > remaining
 				self.regularAbsorbBar:SetMinMaxValues(0, remaining)
 				self.regularAbsorbBar:SetValue(cappedAbsorb)
-				self.regularAbsorbBar:SetAlpha(hasOvershield and 0 or 1)
 				local overshieldOpacity = (db.Overshield and db.Overshield.Opacity) or 1
+				self.regularAbsorbBar:SetAlpha(hasOvershield and 0 or overshieldOpacity)
+				if self.absorbZoneBgFrame then self.absorbZoneBgFrame:SetAlpha(hasOvershield and 0 or 1) end
+				self.overshieldBar:SetValue(math.max(0, totalAbsorbs - remaining))
 				self.overshieldBar:SetAlpha(hasOvershield and overshieldOpacity or 0)
 			end
 		end
@@ -387,15 +390,23 @@ local function CreateBarGroup(unit, containerName, hasPower, getPositionDb, save
 
 		SetBarColor(self.healthBar, hr, hg, hb)
 
-		if self.regularAbsorbBar and self.regularAbsorbBar.Background then
-			self.regularAbsorbBar.Background:SetVertexColor(hr, hg, hb, 1)
+		if self.absorbZoneBg then
+			self.absorbZoneBg:SetVertexColor(hr, hg, hb, 1)
+		end
+
+		local oc = db.Overshield and db.Overshield.Color
+		local ocr = (oc and oc[1]) or 1
+		local ocg = (oc and oc[2]) or 1
+		local ocb = (oc and oc[3]) or 1
+
+		if self.regularAbsorbBar then
+			self.regularAbsorbBar:SetStatusBarColor(ocr, ocg, ocb, 1)
+			if self.regularAbsorbBar.Background then
+				self.regularAbsorbBar.Background:SetVertexColor(ocr, ocg, ocb, 1)
+			end
 		end
 
 		if self.overshieldBar then
-			local oc = db.Overshield and db.Overshield.Color
-			local ocr = (oc and oc[1]) or 1
-			local ocg = (oc and oc[2]) or 1
-			local ocb = (oc and oc[3]) or 1
 			self.overshieldBar:SetStatusBarColor(ocr, ocg, ocb, 1)
 			if self.overshieldBar.Background then
 				self.overshieldBar.Background:SetVertexColor(ocr, ocg, ocb, 1)
@@ -454,6 +465,10 @@ local function CreateBarGroup(unit, containerName, hasPower, getPositionDb, save
 
 		if texture and self.overshieldBar and self.overshieldBar.Background then
 			self.overshieldBar.Background:SetTexture(texture)
+		end
+
+		if texture and self.absorbZoneBg then
+			self.absorbZoneBg:SetTexture(texture)
 		end
 	end
 
@@ -519,6 +534,12 @@ local function CreateBarGroup(unit, containerName, hasPower, getPositionDb, save
 			self.regularAbsorbBar.Background = self.regularAbsorbBar:CreateTexture(nil, "BACKGROUND")
 			self.regularAbsorbBar.Background:SetPoint("TOPLEFT", self.regularAbsorbBar, "TOPLEFT", 0, 0)
 			self.regularAbsorbBar.Background:SetPoint("BOTTOMRIGHT", regAbsTex, "BOTTOMRIGHT", 0, 0)
+
+			-- StatusBar wrapper so we can use SetAlphaFromBoolean to hide when an overshield is active
+			self.absorbZoneBgFrame = CreateFrame("StatusBar", nil, self.container)
+			self.absorbZoneBg = self.absorbZoneBgFrame:CreateTexture(nil, "ARTWORK")
+			self.absorbZoneBg:SetPoint("TOPLEFT", self.absorbZoneBgFrame, "TOPLEFT", 0, 0)
+			self.absorbZoneBg:SetPoint("BOTTOMRIGHT", regAbsTex, "BOTTOMRIGHT", 0, 0)
 		end
 
 		self.regularAbsorbBar:SetStatusBarColor(1, 1, 1, 1)
@@ -556,6 +577,11 @@ local function CreateBarGroup(unit, containerName, hasPower, getPositionDb, save
 		self.regularAbsorbBar:SetPoint("TOPLEFT", self.healthBar:GetStatusBarTexture(), "TOPRIGHT", 0, 0)
 		self.regularAbsorbBar:SetPoint("BOTTOMRIGHT", self.healthBar, "BOTTOMRIGHT", 0, 0)
 
+		if self.absorbZoneBgFrame then
+			self.absorbZoneBgFrame:SetPoint("TOPLEFT", self.healthBar:GetStatusBarTexture(), "TOPRIGHT", 0, 0)
+			self.absorbZoneBgFrame:SetPoint("BOTTOMRIGHT", self.healthBar, "BOTTOMRIGHT", 0, 0)
+		end
+
 		if CreateUnitHealPredictionCalculator then
 			self.healPredictionCalc = CreateUnitHealPredictionCalculator()
 			self.healPredictionCalc:SetDamageAbsorbClampMode(Enum.UnitDamageAbsorbClampMode.MissingHealth)
@@ -567,6 +593,7 @@ local function CreateBarGroup(unit, containerName, hasPower, getPositionDb, save
 		-- Must be above healthBar so its background isn't covered by healthBar's dark background
 		self.overshieldBar:SetFrameLevel(baseLevel + 2)
 		self.regularAbsorbBar:SetFrameLevel(baseLevel + 2)
+		if self.absorbZoneBgFrame then self.absorbZoneBgFrame:SetFrameLevel(baseLevel + 1) end
 
 		if db.Border then
 			self.healthBar.Outline = AddBlackOutline(self.healthBar)

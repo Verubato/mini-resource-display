@@ -3,18 +3,13 @@ local addonName, addon = ...
 local mini = addon.Framework
 local LSM = LibStub and LibStub("LibSharedMedia-3.0", false)
 local eventsFrame
-local container
-local healthBar
-local powerBar
-local overshieldBar
-local regularAbsorbBar
-local healPredictionCalc
-local healthText
-local powerText
 local fallbackTexture = "Interface\\TARGETINGFRAME\\UI-StatusBar"
 local smoothing = Enum and Enum.StatusBarInterpolation and Enum.StatusBarInterpolation.ExponentialEaseOut
 ---@type Db
 local db
+
+local playerGroup
+local petGroup
 
 local function SafeGetRelativeFrame(name)
 	if type(name) ~= "string" or name == "" then
@@ -38,19 +33,6 @@ local function GetConfiguredTexture()
 	return texture or fallbackTexture
 end
 
-local function ApplyPosition()
-	container:ClearAllPoints()
-	container:SetPoint(
-		db.Point or "CENTER",
-		SafeGetRelativeFrame(db.RelativeTo),
-		db.RelativePoint or "CENTER",
-		db.X or 0,
-		db.Y or 0
-	)
-	container:EnableMouse(not db.Locked)
-	container:SetMovable(not db.Locked)
-end
-
 local function AddBlackOutline(frame)
 	local outline = CreateFrame("Frame", nil, frame, "BackdropTemplate")
 	outline:SetPoint("TOPLEFT", frame, -1, 1)
@@ -67,42 +49,6 @@ local function AddBlackOutline(frame)
 	outline:SetBackdropBorderColor(0, 0, 0, 1)
 
 	return outline
-end
-
-local function CreateFadeAnimations()
-	container.FadeIn = container:CreateAnimationGroup()
-
-	local fadeInAlpha = container.FadeIn:CreateAnimation("Alpha")
-	fadeInAlpha:SetOrder(1)
-	fadeInAlpha:SetFromAlpha(0)
-	fadeInAlpha:SetToAlpha(1)
-	fadeInAlpha:SetSmoothing("OUT")
-	container.FadeIn.Alpha = fadeInAlpha
-
-	container.FadeIn:SetScript("OnPlay", function()
-		container:Show()
-	end)
-
-	container.FadeIn:SetScript("OnFinished", function()
-		if container.IsShowing then
-			container:SetAlpha(1)
-		end
-	end)
-
-	container.FadeOut = container:CreateAnimationGroup()
-
-	local fadeOutAlpha = container.FadeOut:CreateAnimation("Alpha")
-	fadeOutAlpha:SetOrder(1)
-	fadeOutAlpha:SetFromAlpha(1)
-	fadeOutAlpha:SetToAlpha(0)
-	fadeOutAlpha:SetSmoothing("OUT")
-	container.FadeOut.Alpha = fadeOutAlpha
-
-	container.FadeOut:SetScript("OnFinished", function()
-		if not container.IsShowing then
-			container:Hide()
-		end
-	end)
 end
 
 local function CreateBackground(statusBar)
@@ -124,180 +70,6 @@ local function SetBarColor(bar, r, g, b)
 	end
 end
 
-local function FadeTo(show)
-	CreateFadeAnimations()
-
-	if container.IsShowing == show then
-		return
-	end
-
-	container.IsShowing = show and true or false
-
-	if show then
-		if container.FadeOut and container.FadeOut:IsPlaying() then
-			container.FadeOut:Stop()
-		end
-
-		if container.FadeIn and container.FadeIn.Alpha then
-			container.FadeIn.Alpha:SetDuration(db.FadeInDuration or 1)
-			container.FadeIn.Alpha:SetFromAlpha(0)
-			container.FadeIn.Alpha:SetToAlpha(1)
-
-			container.FadeIn:Stop()
-			container.FadeIn:Play()
-		else
-			container:SetAlpha(1)
-			container:Show()
-		end
-	else
-		if container.FadeIn and container.FadeIn:IsPlaying() then
-			container.FadeIn:Stop()
-		end
-
-		if container.FadeOut and container.FadeOut.Alpha then
-			container.FadeOut.Alpha:SetDuration(db.FadeOutDuration or 1)
-			container.FadeOut.Alpha:SetFromAlpha(1)
-			container.FadeOut.Alpha:SetToAlpha(0)
-
-			container.FadeOut:Stop()
-			container.FadeOut:Play()
-		else
-			container:SetAlpha(0)
-			container:Hide()
-		end
-	end
-end
-
-local function UpdateSizes()
-	local pad = db.Padding or 0
-	local gap = db.Gap or 0
-	local w = db.Width or 150
-	local h = db.Height or 15
-	local showHealth = (db.ShowHealth ~= false)
-	local showPower = (db.ShowPower ~= false)
-
-	local bars = 0
-	if showHealth then
-		bars = bars + 1
-	end
-	if showPower then
-		bars = bars + 1
-	end
-
-	if bars > 0 then
-		local totalWidth = w + pad * 2
-		local totalHeight = (h * bars) + ((bars == 2) and gap or 0) + pad * 2
-
-		container:SetSize(totalWidth, totalHeight)
-		container:Show()
-	else
-		container:Hide()
-	end
-
-	healthBar:ClearAllPoints()
-	powerBar:ClearAllPoints()
-
-	healthBar:SetHeight(h)
-	powerBar:SetHeight(h)
-
-	healthBar:SetShown(showHealth)
-	powerBar:SetShown(showPower)
-
-	if showHealth then
-		healthBar:SetPoint("TOPLEFT", container, "TOPLEFT", pad, -pad)
-		healthBar:SetPoint("TOPRIGHT", container, "TOPRIGHT", -pad, -pad)
-	end
-
-	if showHealth and showPower then
-		powerBar:SetPoint("TOPLEFT", healthBar, "BOTTOMLEFT", 0, -gap)
-		powerBar:SetPoint("TOPRIGHT", healthBar, "BOTTOMRIGHT", 0, -gap)
-	elseif showPower then
-		powerBar:SetPoint("TOPLEFT", container, "TOPLEFT", pad, -pad)
-		powerBar:SetPoint("TOPRIGHT", container, "TOPRIGHT", -pad, -pad)
-	end
-
-	if db.ShowText then
-		healthText:SetShown(showHealth)
-		powerText:SetShown(showPower)
-	else
-		healthText:Hide()
-		powerText:Hide()
-	end
-
-	if db.FontShadow then
-		healthText:SetShadowOffset(1, -1)
-		healthText:SetShadowColor(0, 0, 0, 1)
-
-		powerText:SetShadowOffset(1, -1)
-		powerText:SetShadowColor(0, 0, 0, 1)
-	end
-end
-
-local function UpdateAbsorb()
-	if not overshieldBar then
-		return
-	end
-
-	local maxHealth = UnitHealthMax("player") or 0
-	local totalAbsorbs = UnitGetTotalAbsorbs("player") or 0
-
-	overshieldBar:SetMinMaxValues(0, maxHealth)
-	overshieldBar:SetValue(totalAbsorbs)
-
-	if regularAbsorbBar then
-		if healPredictionCalc and UnitGetDetailedHealPrediction then
-			-- Midnight+: use calculator to avoid secret value arithmetic
-			UnitGetDetailedHealPrediction("player", nil, healPredictionCalc)
-			local absorbAmount, clamped = healPredictionCalc:GetDamageAbsorbs()
-			local missingHealth = healPredictionCalc:GetMissingHealth()
-			regularAbsorbBar:SetMinMaxValues(0, missingHealth)
-			regularAbsorbBar:SetValue(absorbAmount or 0)
-			regularAbsorbBar:SetAlphaFromBoolean(clamped, 0, 1)
-			overshieldBar:SetAlphaFromBoolean(clamped, 1, 0)
-		else
-			-- Legacy: values are non-secret numbers, direct math is safe
-			local hp = UnitHealth("player") or 0
-			local remaining = math.max(0, maxHealth - hp)
-			local cappedAbsorb = math.min(totalAbsorbs, remaining)
-			local hasOvershield = totalAbsorbs > remaining
-			regularAbsorbBar:SetMinMaxValues(0, remaining)
-			regularAbsorbBar:SetValue(cappedAbsorb)
-			regularAbsorbBar:SetAlpha(hasOvershield and 0 or 1)
-			overshieldBar:SetAlpha(hasOvershield and 1 or 0)
-		end
-	end
-end
-
-local function UpdateHealth()
-	local hp = UnitHealth("player") or 0
-	local max = UnitHealthMax("player") or 1
-
-	healthBar:SetMinMaxValues(0, max)
-	healthBar:SetValue(hp, smoothing)
-
-	if db.ShowText then
-		if db.UsePercent then
-			local pct = 0
-			if type(UnitHealthPercent) == "function" then
-				pct = UnitHealthPercent("player", true, (CurveConstants and CurveConstants.ScaleTo100))
-			else
-				if max > 0 then
-					pct = math.floor((hp / max) * 100 + 0.5)
-				end
-			end
-			healthText:SetText(string.format("%d%%", pct))
-		else
-			local format = db.HealthTextFormat or "%s/%s"
-			local currentHpAbbreviated = AbbreviateNumbers(hp)
-			local maxHpAbbreviated = AbbreviateNumbers(max)
-
-			healthText:SetText(string.format(format, currentHpAbbreviated, maxHpAbbreviated))
-		end
-	end
-
-	UpdateAbsorb()
-end
-
 local function GetPowerColor()
 	if db.PowerUseTypeColor then
 		local pType = UnitPowerType("player")
@@ -314,266 +86,596 @@ local function GetPowerColor()
 	return 0.2, 0.6, 1.0
 end
 
-local function UpdatePower()
-	local powerType = UnitPowerType("player")
-	local power = UnitPower("player", powerType) or 0
-	local max = UnitPowerMax("player", powerType) or 1
+-- Creates a self-contained bar group for a WoW unit.
+-- hasPower: whether this group includes a power bar (player=true, pet=false)
+-- getPositionDb: function() → table with Point/RelativeTo/RelativePoint/X/Y/Locked
+-- savePosition: function(point, relativePoint, x, y)
+local function CreateBarGroup(unit, containerName, hasPower, getPositionDb, savePosition)
+	local group = {
+		unit = unit,
+		hasPower = hasPower,
+	}
 
-	powerBar:SetMinMaxValues(0, max)
-	powerBar:SetValue(power, smoothing)
+	function group:SetupFadeAnimations()
+		local c = self.container
+		if c.FadeIn then return end
 
-	local r, g, b = GetPowerColor()
+		c.FadeIn = c:CreateAnimationGroup()
 
-	SetBarColor(powerBar, r, g, b)
+		local fadeInAlpha = c.FadeIn:CreateAnimation("Alpha")
+		fadeInAlpha:SetOrder(1)
+		fadeInAlpha:SetFromAlpha(0)
+		fadeInAlpha:SetToAlpha(1)
+		fadeInAlpha:SetSmoothing("OUT")
+		c.FadeIn.Alpha = fadeInAlpha
 
-	if db.ShowText then
-		if db.UsePercent then
-			local pct = 0
-			if type(UnitPowerPercent) == "function" then
-				pct = UnitPowerPercent("player", powerType, true, (CurveConstants and CurveConstants.ScaleTo100))
-			else
-				if max > 0 then
-					pct = math.floor((power / max) * 100 + 0.5)
-				end
+		c.FadeIn:SetScript("OnPlay", function()
+			c:Show()
+		end)
+
+		c.FadeIn:SetScript("OnFinished", function()
+			if c.IsShowing then
+				c:SetAlpha(1)
 			end
-			powerText:SetText(string.format("%d%%", pct))
+		end)
+
+		c.FadeOut = c:CreateAnimationGroup()
+
+		local fadeOutAlpha = c.FadeOut:CreateAnimation("Alpha")
+		fadeOutAlpha:SetOrder(1)
+		fadeOutAlpha:SetFromAlpha(1)
+		fadeOutAlpha:SetToAlpha(0)
+		fadeOutAlpha:SetSmoothing("OUT")
+		c.FadeOut.Alpha = fadeOutAlpha
+
+		c.FadeOut:SetScript("OnFinished", function()
+			if not c.IsShowing then
+				c:Hide()
+			end
+		end)
+	end
+
+	function group:FadeTo(show)
+		self:SetupFadeAnimations()
+
+		local c = self.container
+
+		if c.IsShowing == show then
+			return
+		end
+
+		c.IsShowing = show and true or false
+
+		if show then
+			if c.FadeOut and c.FadeOut:IsPlaying() then
+				c.FadeOut:Stop()
+			end
+
+			if c.FadeIn and c.FadeIn.Alpha then
+				c.FadeIn.Alpha:SetDuration(db.FadeInDuration or 1)
+				c.FadeIn.Alpha:SetFromAlpha(0)
+				c.FadeIn.Alpha:SetToAlpha(1)
+
+				c.FadeIn:Stop()
+				c.FadeIn:Play()
+			else
+				c:SetAlpha(1)
+				c:Show()
+			end
 		else
-			local format = db.PowerTextFormat or "%s/%s"
-			local currentPowerAbbreviated = AbbreviateNumbers(power)
-			local maxPowerAbbreviated = AbbreviateNumbers(max)
+			if c.FadeIn and c.FadeIn:IsPlaying() then
+				c.FadeIn:Stop()
+			end
 
-			powerText:SetText(string.format(format, currentPowerAbbreviated, maxPowerAbbreviated))
+			if c.FadeOut and c.FadeOut.Alpha then
+				c.FadeOut.Alpha:SetDuration(db.FadeOutDuration or 1)
+				c.FadeOut.Alpha:SetFromAlpha(1)
+				c.FadeOut.Alpha:SetToAlpha(0)
+
+				c.FadeOut:Stop()
+				c.FadeOut:Play()
+			else
+				c:SetAlpha(0)
+				c:Hide()
+			end
 		end
 	end
-end
 
-local function UpdateColors()
-	local hr, hg, hb
+	function group:ApplyPosition()
+		local pos = getPositionDb()
+		self.container:ClearAllPoints()
+		self.container:SetPoint(
+			pos.Point or "CENTER",
+			SafeGetRelativeFrame(pos.RelativeTo),
+			pos.RelativePoint or "CENTER",
+			pos.X or 0,
+			pos.Y or 0
+		)
+		self.container:EnableMouse(not pos.Locked)
+		self.container:SetMovable(not pos.Locked)
+	end
 
-	if db.UseClassColorHealth then
-		local _, class = UnitClass("player")
-		local c = class and RAID_CLASS_COLORS and RAID_CLASS_COLORS[class]
-		if c then
-			hr, hg, hb = c.r, c.g, c.b
+	function group:UpdateSizes()
+		if not self.hasPower and not db.ShowPetBar then
+			return
+		end
+
+		local pad = db.Padding or 0
+		local gap = db.Gap or 0
+		local w = (not self.hasPower and db.PetWidth) or db.Width or 150
+		local h = (not self.hasPower and db.PetHeight) or db.Height or 15
+
+		local showHealth = not self.hasPower or (db.ShowHealth ~= false)
+		local showPower = self.hasPower and (db.ShowPower ~= false)
+
+		local bars = 0
+		if showHealth then bars = bars + 1 end
+		if showPower then bars = bars + 1 end
+
+		if bars > 0 then
+			local totalHeight = (h * bars) + ((bars == 2) and gap or 0) + pad * 2
+			self.container:SetSize(w + pad * 2, totalHeight)
+			self.container:Show()
+		else
+			self.container:Hide()
+		end
+
+		self.healthBar:ClearAllPoints()
+		self.healthBar:SetHeight(h)
+		self.healthBar:SetShown(showHealth)
+
+		if self.powerBar then
+			self.powerBar:ClearAllPoints()
+			self.powerBar:SetHeight(h)
+			self.powerBar:SetShown(showPower)
+		end
+
+		if showHealth then
+			self.healthBar:SetPoint("TOPLEFT", self.container, "TOPLEFT", pad, -pad)
+			self.healthBar:SetPoint("TOPRIGHT", self.container, "TOPRIGHT", -pad, -pad)
+		end
+
+		if self.powerBar then
+			if showHealth and showPower then
+				self.powerBar:SetPoint("TOPLEFT", self.healthBar, "BOTTOMLEFT", 0, -gap)
+				self.powerBar:SetPoint("TOPRIGHT", self.healthBar, "BOTTOMRIGHT", 0, -gap)
+			elseif showPower then
+				self.powerBar:SetPoint("TOPLEFT", self.container, "TOPLEFT", pad, -pad)
+				self.powerBar:SetPoint("TOPRIGHT", self.container, "TOPRIGHT", -pad, -pad)
+			end
+		end
+
+		if db.ShowText then
+			self.healthText:SetShown(showHealth)
+			if self.powerText then self.powerText:SetShown(showPower) end
+		else
+			self.healthText:Hide()
+			if self.powerText then self.powerText:Hide() end
+		end
+
+		if db.FontShadow then
+			self.healthText:SetShadowOffset(1, -1)
+			self.healthText:SetShadowColor(0, 0, 0, 1)
+
+			if self.powerText then
+				self.powerText:SetShadowOffset(1, -1)
+				self.powerText:SetShadowColor(0, 0, 0, 1)
+			end
+		else
+			self.healthText:SetShadowOffset(0, 0)
+			if self.powerText then self.powerText:SetShadowOffset(0, 0) end
 		end
 	end
 
-	if not hr then
-		hr = (db.HealthColor and db.HealthColor[1]) or 0
-		hg = (db.HealthColor and db.HealthColor[2]) or 1
-		hb = (db.HealthColor and db.HealthColor[3]) or 0
+	function group:UpdateHealth()
+		local hp = UnitHealth(self.unit) or 0
+		local max = UnitHealthMax(self.unit) or 1
+
+		self.healthBar:SetMinMaxValues(0, max)
+		self.healthBar:SetValue(hp, smoothing)
+
+		if db.ShowText then
+			if db.UsePercent then
+				local pct = 0
+				if type(UnitHealthPercent) == "function" then
+					pct = UnitHealthPercent(self.unit, true, (CurveConstants and CurveConstants.ScaleTo100))
+				else
+					if max > 0 then
+						pct = math.floor((hp / max) * 100 + 0.5)
+					end
+				end
+				self.healthText:SetText(string.format("%d%%", pct))
+			else
+				local format = db.HealthTextFormat or "%s/%s"
+				local currentHpAbbreviated = AbbreviateNumbers(hp)
+				local maxHpAbbreviated = AbbreviateNumbers(max)
+
+				self.healthText:SetText(string.format(format, currentHpAbbreviated, maxHpAbbreviated))
+			end
+		end
+
+		self:UpdateAbsorb()
 	end
 
-	SetBarColor(healthBar, hr, hg, hb)
+	function group:UpdateAbsorb()
+		if not self.overshieldBar then
+			return
+		end
 
-	if regularAbsorbBar and regularAbsorbBar.Background then
-		regularAbsorbBar.Background:SetVertexColor(hr, hg, hb, 1)
+		local maxHealth = UnitHealthMax(self.unit) or 0
+		local totalAbsorbs = UnitGetTotalAbsorbs(self.unit) or 0
+
+		self.overshieldBar:SetMinMaxValues(0, maxHealth)
+		self.overshieldBar:SetValue(totalAbsorbs)
+
+		if self.regularAbsorbBar then
+			if self.healPredictionCalc and UnitGetDetailedHealPrediction then
+				-- Midnight+: use calculator to avoid secret value arithmetic
+				UnitGetDetailedHealPrediction(self.unit, nil, self.healPredictionCalc)
+				local absorbAmount, clamped = self.healPredictionCalc:GetDamageAbsorbs()
+				local missingHealth = self.healPredictionCalc:GetMissingHealth()
+				self.regularAbsorbBar:SetMinMaxValues(0, missingHealth)
+				self.regularAbsorbBar:SetValue(absorbAmount or 0)
+				self.regularAbsorbBar:SetAlphaFromBoolean(clamped, 0, 1)
+				self.overshieldBar:SetAlphaFromBoolean(clamped, 1, 0)
+			else
+				-- Legacy: values are non-secret numbers, direct math is safe
+				local hp = UnitHealth(self.unit) or 0
+				local remaining = math.max(0, maxHealth - hp)
+				local cappedAbsorb = math.min(totalAbsorbs, remaining)
+				local hasOvershield = totalAbsorbs > remaining
+				self.regularAbsorbBar:SetMinMaxValues(0, remaining)
+				self.regularAbsorbBar:SetValue(cappedAbsorb)
+				self.regularAbsorbBar:SetAlpha(hasOvershield and 0 or 1)
+				self.overshieldBar:SetAlpha(hasOvershield and 1 or 0)
+			end
+		end
 	end
 
-	if overshieldBar and overshieldBar.Background then
-		overshieldBar.Background:SetVertexColor(hr, hg, hb, 1)
+	function group:UpdatePower()
+		if not self.powerBar then return end
+
+		local powerType = UnitPowerType(self.unit)
+		local power = UnitPower(self.unit, powerType) or 0
+		local max = UnitPowerMax(self.unit, powerType) or 1
+
+		self.powerBar:SetMinMaxValues(0, max)
+		self.powerBar:SetValue(power, smoothing)
+
+		local r, g, b = GetPowerColor()
+		SetBarColor(self.powerBar, r, g, b)
+
+		if db.ShowText and self.powerText then
+			if db.UsePercent then
+				local pct = 0
+				if type(UnitPowerPercent) == "function" then
+					pct = UnitPowerPercent(self.unit, powerType, true, (CurveConstants and CurveConstants.ScaleTo100))
+				else
+					if max > 0 then
+						pct = math.floor((power / max) * 100 + 0.5)
+					end
+				end
+				self.powerText:SetText(string.format("%d%%", pct))
+			else
+				local format = db.PowerTextFormat or "%s/%s"
+				local currentPowerAbbreviated = AbbreviateNumbers(power)
+				local maxPowerAbbreviated = AbbreviateNumbers(max)
+
+				self.powerText:SetText(string.format(format, currentPowerAbbreviated, maxPowerAbbreviated))
+			end
+		end
 	end
 
-	local r, g, b = GetPowerColor()
-	SetBarColor(powerBar, r, g, b)
-end
+	function group:UpdateColors()
+		local hr, hg, hb
 
-local function UpdateTextures()
-	local texture = GetConfiguredTexture()
+		if db.UseClassColorHealth then
+			local _, class = UnitClass(self.unit)
+			local c = class and RAID_CLASS_COLORS and RAID_CLASS_COLORS[class]
+			if c then
+				hr, hg, hb = c.r, c.g, c.b
+			end
+		end
 
-	healthBar:SetStatusBarTexture(texture)
-	powerBar:SetStatusBarTexture(texture)
+		if not hr then
+			hr = (db.HealthColor and db.HealthColor[1]) or 0
+			hg = (db.HealthColor and db.HealthColor[2]) or 1
+			hb = (db.HealthColor and db.HealthColor[3]) or 0
+		end
 
-	local hpTexture = healthBar:GetStatusBarTexture()
-	local powerTexture = powerBar:GetStatusBarTexture()
+		SetBarColor(self.healthBar, hr, hg, hb)
 
-	if hpTexture == nil then
-		healthBar:SetStatusBarTexture(fallbackTexture)
-		powerBar:SetStatusBarTexture(fallbackTexture)
+		if self.regularAbsorbBar and self.regularAbsorbBar.Background then
+			self.regularAbsorbBar.Background:SetVertexColor(hr, hg, hb, 1)
+		end
 
-		hpTexture = healthBar:GetStatusBarTexture()
-		powerTexture = powerBar:GetStatusBarTexture()
+		if self.overshieldBar and self.overshieldBar.Background then
+			self.overshieldBar.Background:SetVertexColor(hr, hg, hb, 1)
+		end
+
+		if self.powerBar then
+			local r, g, b = GetPowerColor()
+			SetBarColor(self.powerBar, r, g, b)
+		end
 	end
 
-	if hpTexture then
-		hpTexture:SetHorizTile(false)
-		hpTexture:SetVertTile(false)
+	function group:UpdateTextures()
+		local texture = GetConfiguredTexture()
+
+		self.healthBar:SetStatusBarTexture(texture)
+
+		local hpTexture = self.healthBar:GetStatusBarTexture()
+
+		if hpTexture == nil then
+			self.healthBar:SetStatusBarTexture(fallbackTexture)
+			hpTexture = self.healthBar:GetStatusBarTexture()
+		end
+
+		if hpTexture then
+			hpTexture:SetHorizTile(false)
+			hpTexture:SetVertTile(false)
+		end
+
+		if texture and self.healthBar.Background then
+			self.healthBar.Background:SetTexture(texture)
+		end
+
+		if self.powerBar then
+			self.powerBar:SetStatusBarTexture(texture)
+			local powerTexture = self.powerBar:GetStatusBarTexture()
+
+			if powerTexture == nil then
+				self.powerBar:SetStatusBarTexture(fallbackTexture)
+				powerTexture = self.powerBar:GetStatusBarTexture()
+			end
+
+			if powerTexture then
+				powerTexture:SetHorizTile(false)
+				powerTexture:SetVertTile(false)
+			end
+
+			if texture and self.powerBar.Background then
+				self.powerBar.Background:SetTexture(texture)
+			end
+		end
+
+		if texture and self.regularAbsorbBar and self.regularAbsorbBar.Background then
+			self.regularAbsorbBar.Background:SetTexture(texture)
+		end
+
+		if texture and self.overshieldBar and self.overshieldBar.Background then
+			self.overshieldBar.Background:SetTexture(texture)
+		end
 	end
 
-	if powerTexture then
-		powerTexture:SetHorizTile(false)
-		powerTexture:SetVertTile(false)
+	function group:UpdateFonts()
+		self.healthText:SetFont(db.Font or "Fonts\\FRIZQT__.TTF", db.FontSize or 11, db.FontFlags or "OUTLINE")
+
+		if self.powerText then
+			self.powerText:SetFont(db.Font or "Fonts\\FRIZQT__.TTF", db.FontSize or 11, db.FontFlags or "OUTLINE")
+		end
 	end
 
-	if texture and healthBar.Background then
-		healthBar.Background:SetTexture(texture)
+	function group:UpdateVisibility()
+		if not self.hasPower then
+			if not db.ShowPetBar or not UnitExists("pet") then
+				self.container:SetAlpha(0)
+				self.container:Hide()
+				self.container.IsShowing = false
+				return
+			end
+		end
+
+		if db.AlwaysShow then
+			self:FadeTo(true)
+			return
+		end
+
+		self:FadeTo(UnitAffectingCombat("player"))
 	end
 
-	if texture and powerBar.Background then
-		powerBar.Background:SetTexture(texture)
+	function group:Load()
+		self.container = CreateFrame("Frame", containerName, UIParent, "BackdropTemplate")
+		self.container:SetClampedToScreen(true)
+		self.container:EnableMouse(true)
+		self.container:SetMovable(true)
+		self.container:RegisterForDrag("LeftButton")
+		self.container:SetScript("OnDragStart", self.container.StartMoving)
+		self.container:SetScript("OnDragStop", function(c)
+			c:StopMovingOrSizing()
+			local point, _, relativePoint, x, y = c:GetPoint(1)
+			savePosition(point, relativePoint, x, y)
+		end)
+
+		self.container:SetAlpha(0)
+		self.container:Hide()
+
+		self:SetupFadeAnimations()
+
+		self.healthBar = CreateFrame("StatusBar", nil, self.container)
+		self.healthBar.Background = CreateBackground(self.healthBar)
+
+		self.regularAbsorbBar = CreateFrame("StatusBar", nil, self.container)
+		self.regularAbsorbBar:SetStatusBarTexture("Interface\\RaidFrame\\Shield-Overlay")
+
+		local regAbsTex = self.regularAbsorbBar:GetStatusBarTexture()
+		if regAbsTex then
+			regAbsTex:SetTexture("Interface\\RaidFrame\\Shield-Overlay", "REPEAT", "REPEAT")
+			regAbsTex:SetHorizTile(true)
+			regAbsTex:SetVertTile(true)
+			regAbsTex:SetDrawLayer("ARTWORK", 1)
+			regAbsTex:SetDesaturated(true)
+
+			-- Background anchored to the fill texture's right so it only covers the absorb region
+			self.regularAbsorbBar.Background = self.regularAbsorbBar:CreateTexture(nil, "BACKGROUND")
+			self.regularAbsorbBar.Background:SetPoint("TOPLEFT", self.regularAbsorbBar, "TOPLEFT", 0, 0)
+			self.regularAbsorbBar.Background:SetPoint("BOTTOMRIGHT", regAbsTex, "BOTTOMRIGHT", 0, 0)
+		end
+
+		self.regularAbsorbBar:SetStatusBarColor(1, 1, 1, 1)
+
+		self.overshieldBar = CreateFrame("StatusBar", nil, self.container)
+		self.overshieldBar:SetAllPoints(self.healthBar)
+		self.overshieldBar:SetReverseFill(true)
+		self.overshieldBar:SetStatusBarTexture("Interface\\RaidFrame\\Shield-Overlay")
+
+		local absTex = self.overshieldBar:GetStatusBarTexture()
+		if absTex then
+			absTex:SetTexture("Interface\\RaidFrame\\Shield-Overlay", "REPEAT", "REPEAT")
+			absTex:SetHorizTile(true)
+			absTex:SetVertTile(true)
+			absTex:SetDrawLayer("ARTWORK", 1)
+			absTex:SetDesaturated(true)
+
+			-- Background anchored to the fill texture's left so it only covers the overshield region
+			self.overshieldBar.Background = self.overshieldBar:CreateTexture(nil, "BACKGROUND")
+			self.overshieldBar.Background:SetPoint("TOPRIGHT", self.overshieldBar, "TOPRIGHT", 0, 0)
+			self.overshieldBar.Background:SetPoint("BOTTOMLEFT", absTex, "BOTTOMLEFT", 0, 0)
+		end
+
+		self.overshieldBar:SetStatusBarColor(1, 1, 1, 1)
+
+		if self.hasPower then
+			self.powerBar = CreateFrame("StatusBar", nil, self.container)
+			self.powerBar.Background = CreateBackground(self.powerBar)
+		end
+
+		self:UpdateTextures()
+
+		-- Anchor the regular absorb bar to the right edge of the health bar fill texture.
+		-- As health changes the fill texture resizes, so this automatically tracks health end.
+		self.regularAbsorbBar:SetPoint("TOPLEFT", self.healthBar:GetStatusBarTexture(), "TOPRIGHT", 0, 0)
+		self.regularAbsorbBar:SetPoint("BOTTOMRIGHT", self.healthBar, "BOTTOMRIGHT", 0, 0)
+
+		if CreateUnitHealPredictionCalculator then
+			self.healPredictionCalc = CreateUnitHealPredictionCalculator()
+			self.healPredictionCalc:SetDamageAbsorbClampMode(Enum.UnitDamageAbsorbClampMode.MissingHealth)
+		end
+
+		local baseLevel = self.container:GetFrameLevel() or 0
+		self.healthBar:SetFrameLevel(baseLevel + 1)
+		if self.powerBar then self.powerBar:SetFrameLevel(baseLevel + 1) end
+		-- Must be above healthBar so its background isn't covered by healthBar's dark background
+		self.overshieldBar:SetFrameLevel(baseLevel + 2)
+		self.regularAbsorbBar:SetFrameLevel(baseLevel + 2)
+
+		if db.Border then
+			self.healthBar.Outline = AddBlackOutline(self.healthBar)
+			if self.powerBar then
+				self.powerBar.Outline = AddBlackOutline(self.powerBar)
+			end
+		end
+
+		-- Text frame above all bars so font strings aren't covered by regularAbsorbBar
+		local textFrame = CreateFrame("Frame", nil, self.container)
+		textFrame:SetFrameLevel(baseLevel + 3)
+
+		self.healthText = textFrame:CreateFontString(nil, "OVERLAY")
+		self.healthText:SetPoint("CENTER", self.healthBar, "CENTER", 0, 0)
+
+		if self.powerBar then
+			self.powerText = textFrame:CreateFontString(nil, "OVERLAY")
+			self.powerText:SetPoint("CENTER", self.powerBar, "CENTER", 0, 0)
+		end
+
+		self:UpdateFonts()
 	end
 
-	if texture and regularAbsorbBar and regularAbsorbBar.Background then
-		regularAbsorbBar.Background:SetTexture(texture)
+	function group:Reload()
+		self:ApplyPosition()
+		self:UpdateSizes()
+		self:UpdateColors()
+		self:UpdateVisibility()
+		self:UpdateHealth()
+		self:UpdateAbsorb()
+		self:UpdatePower()
+		self:UpdateTextures()
+		self:UpdateFonts()
 	end
 
-	if texture and overshieldBar and overshieldBar.Background then
-		overshieldBar.Background:SetTexture(texture)
-	end
-end
-
-local function UpdateVisibility()
-	if db.AlwaysShow then
-		FadeTo(true)
-		return
-	end
-
-	FadeTo(UnitAffectingCombat("player"))
-end
-
-local function UpdateFonts()
-	healthText:SetFont(db.Font or "Fonts\\FRIZQT__.TTF", db.FontSize or 11, db.FontFlags or "OUTLINE")
-	powerText:SetFont(db.Font or "Fonts\\FRIZQT__.TTF", db.FontSize or 11, db.FontFlags or "OUTLINE")
+	return group
 end
 
 local function Load()
-	container = CreateFrame("Frame", addonName .. "Frame", UIParent, "BackdropTemplate")
-	container:SetClampedToScreen(true)
-	container:EnableMouse(not db.Locked)
-	container:SetMovable(not db.Locked)
-	container:RegisterForDrag("LeftButton")
-	container:SetScript("OnDragStart", container.StartMoving)
-	container:SetScript("OnDragStop", function(self)
-		self:StopMovingOrSizing()
-		local point, _, relativePoint, x, y = self:GetPoint(1)
-		db.Point = point
-		db.RelativePoint = relativePoint
-		db.X = math.floor((x or 0) + 0.5)
-		db.Y = math.floor((y or 0) + 0.5)
-	end)
+	playerGroup = CreateBarGroup(
+		"player",
+		addonName .. "Frame",
+		true,
+		function() return db end,
+		function(point, relativePoint, x, y)
+			db.Point = point
+			db.RelativePoint = relativePoint
+			db.X = math.floor((x or 0) + 0.5)
+			db.Y = math.floor((y or 0) + 0.5)
+		end
+	)
+	playerGroup:Load()
 
-	container:SetAlpha(0)
-	container:Hide()
-
-	CreateFadeAnimations()
-
-	healthBar = CreateFrame("StatusBar", nil, container)
-	healthBar.Background = CreateBackground(healthBar)
-
-	regularAbsorbBar = CreateFrame("StatusBar", nil, container)
-	regularAbsorbBar:SetStatusBarTexture("Interface\\RaidFrame\\Shield-Overlay")
-
-	local regAbsTex = regularAbsorbBar:GetStatusBarTexture()
-	if regAbsTex then
-		regAbsTex:SetTexture("Interface\\RaidFrame\\Shield-Overlay", "REPEAT", "REPEAT")
-		regAbsTex:SetHorizTile(true)
-		regAbsTex:SetVertTile(true)
-		regAbsTex:SetDrawLayer("ARTWORK", 1)
-		regAbsTex:SetDesaturated(true)
-
-		-- Background anchored to the fill texture's right so it only covers the absorb region
-		regularAbsorbBar.Background = regularAbsorbBar:CreateTexture(nil, "BACKGROUND")
-		regularAbsorbBar.Background:SetPoint("TOPLEFT", regularAbsorbBar, "TOPLEFT", 0, 0)
-		regularAbsorbBar.Background:SetPoint("BOTTOMRIGHT", regAbsTex, "BOTTOMRIGHT", 0, 0)
-	end
-
-	regularAbsorbBar:SetStatusBarColor(1, 1, 1, 1)
-
-	overshieldBar = CreateFrame("StatusBar", nil, container)
-	overshieldBar:SetAllPoints(healthBar)
-	overshieldBar:SetReverseFill(true)
-	overshieldBar:SetStatusBarTexture("Interface\\RaidFrame\\Shield-Overlay")
-
-	local absTex = overshieldBar:GetStatusBarTexture()
-	if absTex then
-		absTex:SetTexture("Interface\\RaidFrame\\Shield-Overlay", "REPEAT", "REPEAT")
-		absTex:SetHorizTile(true)
-		absTex:SetVertTile(true)
-		absTex:SetDrawLayer("ARTWORK", 1)
-		absTex:SetDesaturated(true)
-
-		-- Background anchored to the fill texture's left so it only covers the overshield region
-		overshieldBar.Background = overshieldBar:CreateTexture(nil, "BACKGROUND")
-		overshieldBar.Background:SetPoint("TOPRIGHT", overshieldBar, "TOPRIGHT", 0, 0)
-		overshieldBar.Background:SetPoint("BOTTOMLEFT", absTex, "BOTTOMLEFT", 0, 0)
-	end
-
-	-- frame level will be set after baseLevel is calculated so it matches other bars
-	overshieldBar:SetStatusBarColor(1, 1, 1, 1)
-
-	powerBar = CreateFrame("StatusBar", nil, container)
-	powerBar.Background = CreateBackground(powerBar)
-
-	UpdateTextures()
-
-	-- Anchor the regular absorb bar to the right edge of the health bar fill texture.
-	-- As health changes the fill texture resizes, so this automatically tracks health end.
-	regularAbsorbBar:SetPoint("TOPLEFT", healthBar:GetStatusBarTexture(), "TOPRIGHT", 0, 0)
-	regularAbsorbBar:SetPoint("BOTTOMRIGHT", healthBar, "BOTTOMRIGHT", 0, 0)
-
-	if CreateUnitHealPredictionCalculator then
-		healPredictionCalc = CreateUnitHealPredictionCalculator()
-		healPredictionCalc:SetDamageAbsorbClampMode(Enum.UnitDamageAbsorbClampMode.MissingHealth)
-	end
-
-	local baseLevel = container:GetFrameLevel() or 0
-	healthBar:SetFrameLevel(baseLevel + 1)
-	powerBar:SetFrameLevel(baseLevel + 1)
-	-- Must be above healthBar so its background isn't covered by healthBar's dark background
-	overshieldBar:SetFrameLevel(baseLevel + 2)
-	regularAbsorbBar:SetFrameLevel(baseLevel + 2)
-
-	if db.Border then
-		healthBar.Outline = AddBlackOutline(healthBar)
-		powerBar.Outline = AddBlackOutline(powerBar)
-	end
-
-	-- Text frame above all bars so font strings aren't covered by regularAbsorbBar
-	local textFrame = CreateFrame("Frame", nil, container)
-	textFrame:SetFrameLevel(baseLevel + 3)
-
-	healthText = textFrame:CreateFontString(nil, "OVERLAY")
-	healthText:SetPoint("CENTER", healthBar, "CENTER", 0, 0)
-
-	powerText = textFrame:CreateFontString(nil, "OVERLAY")
-	powerText:SetPoint("CENTER", powerBar, "CENTER", 0, 0)
-
-	UpdateFonts()
+	petGroup = CreateBarGroup(
+		"pet",
+		addonName .. "PetFrame",
+		false,
+		function() return db.Pet end,
+		function(point, relativePoint, x, y)
+			db.Pet.Point = point
+			db.Pet.RelativePoint = relativePoint
+			db.Pet.X = math.floor((x or 0) + 0.5)
+			db.Pet.Y = math.floor((y or 0) + 0.5)
+		end
+	)
+	petGroup:Load()
 
 	addon:Reload()
 end
 
 local function OnEvent(_, event, arg1)
 	if event == "PLAYER_ENTERING_WORLD" then
-		UpdateVisibility()
-		UpdateHealth()
-		UpdateAbsorb()
-		UpdatePower()
+		playerGroup:UpdateVisibility()
+		playerGroup:UpdateHealth()
+		playerGroup:UpdateAbsorb()
+		playerGroup:UpdatePower()
+		petGroup:UpdateVisibility()
+		petGroup:UpdateHealth()
+		petGroup:UpdateAbsorb()
 		return
 	end
 
 	if event == "PLAYER_REGEN_DISABLED" or event == "PLAYER_REGEN_ENABLED" then
-		UpdateVisibility()
+		playerGroup:UpdateVisibility()
+		petGroup:UpdateVisibility()
 		return
 	end
 
 	if event == "UNIT_HEALTH" or event == "UNIT_HEALTH_FREQUENT" then
 		if arg1 == "player" then
-			UpdateHealth()
+			playerGroup:UpdateHealth()
+		elseif arg1 == "pet" then
+			petGroup:UpdateHealth()
 		end
 		return
 	end
 
 	if event == "UNIT_POWER_UPDATE" or event == "UNIT_POWER_FREQUENT" or event == "UNIT_DISPLAYPOWER" then
 		if arg1 == "player" then
-			UpdatePower()
+			playerGroup:UpdatePower()
 		end
 		return
 	end
 
 	if event == "UNIT_ABSORB_AMOUNT_CHANGED" or event == "UNIT_HEAL_ABSORB_AMOUNT_CHANGED" then
 		if arg1 == "player" then
-			UpdateAbsorb()
+			playerGroup:UpdateAbsorb()
+		elseif arg1 == "pet" then
+			petGroup:UpdateAbsorb()
+		end
+		return
+	end
+
+	if event == "UNIT_PET" then
+		if arg1 == "player" then
+			petGroup:UpdateVisibility()
+			petGroup:UpdateHealth()
+			petGroup:UpdateAbsorb()
 		end
 		return
 	end
@@ -600,14 +702,15 @@ local function OnAddonLoaded()
 			eventsFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
 			eventsFrame:RegisterEvent("PLAYER_REGEN_DISABLED")
 			eventsFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
+			eventsFrame:RegisterEvent("UNIT_PET")
 
 			if eventsFrame.RegisterUnitEvent then
-				eventsFrame:RegisterUnitEvent("UNIT_HEALTH", "player")
+				eventsFrame:RegisterUnitEvent("UNIT_HEALTH", "player", "pet")
 				eventsFrame:RegisterUnitEvent("UNIT_POWER_UPDATE", "player")
 				eventsFrame:RegisterUnitEvent("UNIT_POWER_FREQUENT", "player")
 				eventsFrame:RegisterUnitEvent("UNIT_DISPLAYPOWER", "player")
-				eventsFrame:RegisterUnitEvent("UNIT_ABSORB_AMOUNT_CHANGED", "player")
-				eventsFrame:RegisterUnitEvent("UNIT_HEAL_ABSORB_AMOUNT_CHANGED", "player")
+				eventsFrame:RegisterUnitEvent("UNIT_ABSORB_AMOUNT_CHANGED", "player", "pet")
+				eventsFrame:RegisterUnitEvent("UNIT_HEAL_ABSORB_AMOUNT_CHANGED", "player", "pet")
 			else
 				eventsFrame:RegisterEvent("UNIT_HEALTH")
 				eventsFrame:RegisterEvent("UNIT_POWER_UPDATE")
@@ -623,15 +726,8 @@ local function OnAddonLoaded()
 end
 
 function addon:Reload()
-	ApplyPosition()
-	UpdateSizes()
-	UpdateColors()
-	UpdateVisibility()
-	UpdateHealth()
-	UpdateAbsorb()
-	UpdatePower()
-	UpdateTextures()
-	UpdateFonts()
+	playerGroup:Reload()
+	petGroup:Reload()
 end
 
 mini:WaitForAddonLoad(OnAddonLoaded)

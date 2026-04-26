@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.1.0
+
+Added overshield colour picker.
+
 ## 2.0.0
 
 Added pet health bar.

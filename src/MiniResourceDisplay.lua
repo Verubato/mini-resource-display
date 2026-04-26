@@ -315,7 +315,7 @@ local function CreateBarGroup(unit, containerName, hasPower, getPositionDb, save
 				local missingHealth = self.healPredictionCalc:GetMissingHealth()
 				self.regularAbsorbBar:SetMinMaxValues(0, missingHealth)
 				self.regularAbsorbBar:SetValue(absorbAmount or 0)
-				local overshieldOpacity = (db.Overshield and db.Overshield.Opacity) or 1
+				local overshieldOpacity = (db.Shield and db.Shield.Opacity) or 1
 				self.regularAbsorbBar:SetAlphaFromBoolean(clamped, 0, overshieldOpacity)
 				if self.absorbZoneBgFrame then self.absorbZoneBgFrame:SetAlphaFromBoolean(clamped, 0, 1) end
 				self.overshieldBar:SetValue(totalAbsorbs)
@@ -328,7 +328,7 @@ local function CreateBarGroup(unit, containerName, hasPower, getPositionDb, save
 				local hasOvershield = totalAbsorbs > remaining
 				self.regularAbsorbBar:SetMinMaxValues(0, remaining)
 				self.regularAbsorbBar:SetValue(cappedAbsorb)
-				local overshieldOpacity = (db.Overshield and db.Overshield.Opacity) or 1
+				local overshieldOpacity = (db.Shield and db.Shield.Opacity) or 1
 				self.regularAbsorbBar:SetAlpha(hasOvershield and 0 or overshieldOpacity)
 				if self.absorbZoneBgFrame then self.absorbZoneBgFrame:SetAlpha(hasOvershield and 0 or 1) end
 				self.overshieldBar:SetValue(math.max(0, totalAbsorbs - remaining))
@@ -394,7 +394,7 @@ local function CreateBarGroup(unit, containerName, hasPower, getPositionDb, save
 			self.absorbZoneBg:SetVertexColor(hr, hg, hb, 1)
 		end
 
-		local oc = db.Overshield and db.Overshield.Color
+		local oc = db.Shield and db.Shield.Color
 		local ocr = (oc and oc[1]) or 1
 		local ocg = (oc and oc[2]) or 1
 		local ocb = (oc and oc[3]) or 1

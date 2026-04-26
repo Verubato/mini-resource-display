@@ -51,7 +51,7 @@ local dbDefaults = {
 	PetWidth = 150,
 	PetHeight = 15,
 
-	Overshield = {
+	Shield = {
 		Color = { 1, 1, 1 },
 		Opacity = 1,
 	},
@@ -81,6 +81,12 @@ end
 
 function M:Init()
 	db = mini:GetSavedVars(dbDefaults)
+
+	-- Migrate renamed db key: Overshield -> Shield
+	if db.Overshield then
+		db.Shield = db.Overshield
+		db.Overshield = nil
+	end
 
 	local panel = CreateFrame("Frame")
 	panel.name = addonName
@@ -379,18 +385,18 @@ function M:Init()
 		textureDdl.Dropdown:MiniRefresh()
 	end)
 
-	-- Overshield subcategory
+	-- Shield subcategory
 	local overshieldPanel = CreateFrame("Frame")
-	overshieldPanel.name = "Overshield"
+	overshieldPanel.name = "Shield"
 	mini:AddSubCategory(category, overshieldPanel)
 
 	local osTitle = overshieldPanel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
 	osTitle:SetPoint("TOPLEFT", 0, -16)
-	osTitle:SetText("Overshield")
+	osTitle:SetText("Shield")
 
 	local osSubtitle = overshieldPanel:CreateFontString(nil, "ARTWORK", "GameFontWhite")
 	osSubtitle:SetPoint("TOPLEFT", osTitle, "BOTTOMLEFT", 0, -6)
-	osSubtitle:SetText("Configure the colour and opacity of the overshield bar.")
+	osSubtitle:SetText("Configure the colour and opacity of the shield bars.")
 
 	local osDivider = mini:Divider({
 		Parent = overshieldPanel,
@@ -438,32 +444,32 @@ function M:Init()
 	end)
 
 	local function UpdateOSSwatch()
-		local c = db.Overshield.Color
+		local c = db.Shield.Color
 		osSwatchTex:SetColorTexture(c[1] or 1, c[2] or 1, c[3] or 1, 1)
 	end
 
 	UpdateOSSwatch()
 
 	osSwatch:SetScript("OnClick", function()
-		local c = db.Overshield.Color
+		local c = db.Shield.Color
 
 		local function OnChanged()
 			local r, g, b = ColorPickerFrame:GetColorRGB()
 			local a = ColorPickerFrame:GetColorAlpha()
-			db.Overshield.Color[1] = r
-			db.Overshield.Color[2] = g
-			db.Overshield.Color[3] = b
-			db.Overshield.Opacity = a
+			db.Shield.Color[1] = r
+			db.Shield.Color[2] = g
+			db.Shield.Color[3] = b
+			db.Shield.Opacity = a
 			UpdateOSSwatch()
 			addon:Reload()
 		end
 
 		local function OnCancel()
 			local r, g, b, a = ColorPickerFrame:GetPreviousValues()
-			db.Overshield.Color[1] = r
-			db.Overshield.Color[2] = g
-			db.Overshield.Color[3] = b
-			db.Overshield.Opacity = a
+			db.Shield.Color[1] = r
+			db.Shield.Color[2] = g
+			db.Shield.Color[3] = b
+			db.Shield.Opacity = a
 			UpdateOSSwatch()
 			addon:Reload()
 		end
@@ -473,7 +479,7 @@ function M:Init()
 			opacityFunc = OnChanged,
 			cancelFunc = OnCancel,
 			hasOpacity = true,
-			opacity = db.Overshield.Opacity or 1,
+			opacity = db.Shield.Opacity or 1,
 			r = c[1] or 1,
 			g = c[2] or 1,
 			b = c[3] or 1,

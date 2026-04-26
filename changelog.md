@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.0.0
+
+Added pet health bar.
+
 ## 1.7.1
 
 Fixed textures not applying on load when they are sourced from other addons.

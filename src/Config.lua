@@ -46,6 +46,19 @@ local dbDefaults = {
 
 	HealthTextFormat = "%s/%s",
 	PowerTextFormat = "%s/%s",
+
+	ShowPetBar = false,
+	PetWidth = 150,
+	PetHeight = 15,
+
+	Pet = {
+		Point = "CENTER",
+		RelativeTo = "UIParent",
+		RelativePoint = "CENTER",
+		X = 0,
+		Y = -165,
+		Locked = false,
+	},
 }
 local M = {}
 
@@ -97,12 +110,13 @@ function M:Init()
 	local locked = mini:Checkbox({
 		Parent = panel,
 		LabelText = "Locked",
-		Tooltip = "Locks the position so it can't be accidentally moved.",
+		Tooltip = "Locks the position of all bars so they can't be accidentally moved.",
 		GetValue = function()
 			return db.Locked
 		end,
 		SetValue = function(value)
 			db.Locked = value
+			db.Pet.Locked = value
 			addon:Reload()
 		end,
 	})
@@ -157,6 +171,21 @@ function M:Init()
 	usePercent:SetPoint("TOP", locked, "TOP", 0, 0)
 	usePercent:SetPoint("LEFT", panel, "LEFT", columnStep * 3, 0)
 
+	local showPetBar = mini:Checkbox({
+		Parent = panel,
+		LabelText = "Show pet bar",
+		Tooltip = "Show a separate health bar for your pet.",
+		GetValue = function()
+			return db.ShowPetBar
+		end,
+		SetValue = function(value)
+			db.ShowPetBar = value
+			addon:Reload()
+		end,
+	})
+
+	showPetBar:SetPoint("TOPLEFT", locked, "BOTTOMLEFT", 0, -verticalSpacing)
+
 	local showHealth = mini:Checkbox({
 		Parent = panel,
 		LabelText = "Show health bar",
@@ -170,7 +199,8 @@ function M:Init()
 		end,
 	})
 
-	showHealth:SetPoint("TOPLEFT", locked, "BOTTOMLEFT", 0, -verticalSpacing)
+	showHealth:SetPoint("TOP", showPetBar, "TOP", 0, 0)
+	showHealth:SetPoint("LEFT", panel, "LEFT", columnStep, 0)
 
 	local showPower = mini:Checkbox({
 		Parent = panel,
@@ -185,8 +215,8 @@ function M:Init()
 		end,
 	})
 
-	showPower:SetPoint("TOP", showHealth, "TOP", 0, 0)
-	showPower:SetPoint("LEFT", panel, "LEFT", columnStep, 0)
+	showPower:SetPoint("TOP", showPetBar, "TOP", 0, 0)
+	showPower:SetPoint("LEFT", panel, "LEFT", columnStep * 2, 0)
 
 	local useClassColor = mini:Checkbox({
 		Parent = panel,
@@ -201,15 +231,15 @@ function M:Init()
 		end,
 	})
 
-	useClassColor:SetPoint("TOP", showHealth, "TOP", 0, 0)
-	useClassColor:SetPoint("LEFT", panel, "LEFT", columnStep * 2, 0)
+	useClassColor:SetPoint("TOP", showPetBar, "TOP", 0, 0)
+	useClassColor:SetPoint("LEFT", panel, "LEFT", columnStep * 3, 0)
 
 	local sizeDivider = mini:Divider({
 		Parent = panel,
 		Text = "Size",
 	})
 
-	sizeDivider:SetPoint("TOP", showHealth, "BOTTOM", 0, -verticalSpacing)
+	sizeDivider:SetPoint("TOP", showPetBar, "BOTTOM", 0, -verticalSpacing)
 	sizeDivider:SetPoint("LEFT", panel, "LEFT")
 	sizeDivider:SetPoint("RIGHT", panel, "RIGHT", -horizontalSpacing, 0)
 
@@ -269,6 +299,51 @@ function M:Init()
 
 	textSizeSlider.Slider:SetPoint("TOPLEFT", widthSlider.Slider, "BOTTOMLEFT", 0, -verticalSpacing * 3)
 
+	local petDivider = mini:Divider({
+		Parent = panel,
+		Text = "Pet Bar",
+	})
+
+	petDivider:SetPoint("TOP", textSizeSlider.Slider, "BOTTOM", 0, -verticalSpacing)
+	petDivider:SetPoint("LEFT", panel, "LEFT")
+	petDivider:SetPoint("RIGHT", panel, "RIGHT", -horizontalSpacing, 0)
+
+	local petWidthSlider = mini:Slider({
+		Parent = panel,
+		Min = 100,
+		Max = 400,
+		Step = 10,
+		Width = sliderWidth,
+		LabelText = "Width",
+		GetValue = function()
+			return db.PetWidth
+		end,
+		SetValue = function(value)
+			db.PetWidth = mini:ClampInt(value, 100, 400, dbDefaults.PetWidth)
+			addon:Reload()
+		end,
+	})
+
+	petWidthSlider.Slider:SetPoint("TOPLEFT", petDivider, "BOTTOMLEFT", 0, -verticalSpacing * 3)
+
+	local petHeightSlider = mini:Slider({
+		Parent = panel,
+		Min = 8,
+		Max = 50,
+		Step = 1,
+		Width = sliderWidth,
+		LabelText = "Height",
+		GetValue = function()
+			return db.PetHeight
+		end,
+		SetValue = function(value)
+			db.PetHeight = mini:ClampInt(value, 8, 50, dbDefaults.PetHeight)
+			addon:Reload()
+		end,
+	})
+
+	petHeightSlider.Slider:SetPoint("LEFT", petWidthSlider.Slider, "RIGHT", horizontalSpacing, 0)
+
 	local textureDdl = mini:Dropdown({
 		Parent = panel,
 		Width = columnStep * 2,
@@ -288,7 +363,7 @@ function M:Init()
 		Text = "Look & Feel",
 	})
 
-	textureDivider:SetPoint("TOP", textSizeSlider.Slider, "BOTTOM", 0, -verticalSpacing)
+	textureDivider:SetPoint("TOP", petWidthSlider.Slider, "BOTTOM", 0, -verticalSpacing)
 	textureDivider:SetPoint("LEFT", panel, "LEFT")
 	textureDivider:SetPoint("RIGHT", panel, "RIGHT", -horizontalSpacing, 0)
 
@@ -300,6 +375,8 @@ function M:Init()
 	end)
 
 	SLASH_MINIRESOURCEDISPLAY1 = "/mrd"
+	SLASH_MINIRESOURCEDISPLAY2 = "/minird"
+	SLASH_MINIRESOURCEDISPLAY3 = "/miniresourcedisplay"
 	SlashCmdList.MINIRESOURCEDISPLAY = function(msg)
 		msg = (msg or ""):lower():match("^%s*(.-)%s*$")
 

@@ -51,6 +51,11 @@ local dbDefaults = {
 	PetWidth = 150,
 	PetHeight = 15,
 
+	Overshield = {
+		Color = { 1, 1, 1 },
+		Opacity = 1,
+	},
+
 	Pet = {
 		Point = "CENTER",
 		RelativeTo = "UIParent",
@@ -373,6 +378,109 @@ function M:Init()
 		-- refresh the items
 		textureDdl.Dropdown:MiniRefresh()
 	end)
+
+	-- Overshield subcategory
+	local overshieldPanel = CreateFrame("Frame")
+	overshieldPanel.name = "Overshield"
+	mini:AddSubCategory(category, overshieldPanel)
+
+	local osTitle = overshieldPanel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
+	osTitle:SetPoint("TOPLEFT", 0, -16)
+	osTitle:SetText("Overshield")
+
+	local osSubtitle = overshieldPanel:CreateFontString(nil, "ARTWORK", "GameFontWhite")
+	osSubtitle:SetPoint("TOPLEFT", osTitle, "BOTTOMLEFT", 0, -6)
+	osSubtitle:SetText("Configure the colour and opacity of the overshield bar.")
+
+	local osDivider = mini:Divider({
+		Parent = overshieldPanel,
+		Text = "Colour & Opacity",
+	})
+
+	osDivider:SetPoint("TOP", osSubtitle, "BOTTOM", 0, -verticalSpacing)
+	osDivider:SetPoint("LEFT", overshieldPanel, "LEFT")
+	osDivider:SetPoint("RIGHT", overshieldPanel, "RIGHT", -horizontalSpacing, 0)
+
+	local osSwatchLabel = overshieldPanel:CreateFontString(nil, "ARTWORK", "GameFontWhite")
+	osSwatchLabel:SetPoint("TOPLEFT", osDivider, "BOTTOMLEFT", 0, -verticalSpacing)
+	osSwatchLabel:SetText("Colour")
+
+	local osSwatch = CreateFrame("Button", nil, overshieldPanel)
+	osSwatch:SetSize(24, 24)
+	osSwatch:SetPoint("LEFT", osSwatchLabel, "RIGHT", 8, 0)
+
+	local osSwatchTex = osSwatch:CreateTexture(nil, "BACKGROUND")
+	osSwatchTex:SetAllPoints(true)
+
+	local osSwatchBorder = CreateFrame("Frame", nil, osSwatch, "BackdropTemplate")
+	osSwatchBorder:SetAllPoints(true)
+	osSwatchBorder:SetFrameLevel(osSwatch:GetFrameLevel() + 1)
+	osSwatchBorder:SetBackdrop({
+		edgeFile = "Interface\\Buttons\\WHITE8X8",
+		edgeSize = 1,
+	})
+	osSwatchBorder:SetBackdropBorderColor(1, 1, 1, 1)
+
+	local osSwatchHint = overshieldPanel:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
+	osSwatchHint:SetPoint("LEFT", osSwatch, "RIGHT", 8, 0)
+	osSwatchHint:SetText("Click to change colour and opacity")
+
+	osSwatch:SetScript("OnEnter", function(self)
+		osSwatchBorder:SetBackdropBorderColor(1, 0.82, 0, 1)
+		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+		GameTooltip:SetText("Click to change colour and opacity", 1, 1, 1)
+		GameTooltip:Show()
+	end)
+
+	osSwatch:SetScript("OnLeave", function()
+		osSwatchBorder:SetBackdropBorderColor(1, 1, 1, 1)
+		GameTooltip:Hide()
+	end)
+
+	local function UpdateOSSwatch()
+		local c = db.Overshield.Color
+		osSwatchTex:SetColorTexture(c[1] or 1, c[2] or 1, c[3] or 1, 1)
+	end
+
+	UpdateOSSwatch()
+
+	osSwatch:SetScript("OnClick", function()
+		local c = db.Overshield.Color
+
+		local function OnChanged()
+			local r, g, b = ColorPickerFrame:GetColorRGB()
+			local a = ColorPickerFrame:GetColorAlpha()
+			db.Overshield.Color[1] = r
+			db.Overshield.Color[2] = g
+			db.Overshield.Color[3] = b
+			db.Overshield.Opacity = a
+			UpdateOSSwatch()
+			addon:Reload()
+		end
+
+		local function OnCancel()
+			local r, g, b, a = ColorPickerFrame:GetPreviousValues()
+			db.Overshield.Color[1] = r
+			db.Overshield.Color[2] = g
+			db.Overshield.Color[3] = b
+			db.Overshield.Opacity = a
+			UpdateOSSwatch()
+			addon:Reload()
+		end
+
+		ColorPickerFrame:SetupColorPickerAndShow({
+			swatchFunc = OnChanged,
+			opacityFunc = OnChanged,
+			cancelFunc = OnCancel,
+			hasOpacity = true,
+			opacity = db.Overshield.Opacity or 1,
+			r = c[1] or 1,
+			g = c[2] or 1,
+			b = c[3] or 1,
+		})
+	end)
+
+	overshieldPanel:HookScript("OnShow", UpdateOSSwatch)
 
 	SLASH_MINIRESOURCEDISPLAY1 = "/mrd"
 	SLASH_MINIRESOURCEDISPLAY2 = "/minird"

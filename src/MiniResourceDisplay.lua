@@ -317,7 +317,8 @@ local function CreateBarGroup(unit, containerName, hasPower, getPositionDb, save
 				self.regularAbsorbBar:SetMinMaxValues(0, missingHealth)
 				self.regularAbsorbBar:SetValue(absorbAmount or 0)
 				self.regularAbsorbBar:SetAlphaFromBoolean(clamped, 0, 1)
-				self.overshieldBar:SetAlphaFromBoolean(clamped, 1, 0)
+				local overshieldOpacity = (db.Overshield and db.Overshield.Opacity) or 1
+				self.overshieldBar:SetAlphaFromBoolean(clamped, overshieldOpacity, 0)
 			else
 				-- Legacy: values are non-secret numbers, direct math is safe
 				local hp = UnitHealth(self.unit) or 0
@@ -327,7 +328,8 @@ local function CreateBarGroup(unit, containerName, hasPower, getPositionDb, save
 				self.regularAbsorbBar:SetMinMaxValues(0, remaining)
 				self.regularAbsorbBar:SetValue(cappedAbsorb)
 				self.regularAbsorbBar:SetAlpha(hasOvershield and 0 or 1)
-				self.overshieldBar:SetAlpha(hasOvershield and 1 or 0)
+				local overshieldOpacity = (db.Overshield and db.Overshield.Opacity) or 1
+				self.overshieldBar:SetAlpha(hasOvershield and overshieldOpacity or 0)
 			end
 		end
 	end
@@ -389,8 +391,15 @@ local function CreateBarGroup(unit, containerName, hasPower, getPositionDb, save
 			self.regularAbsorbBar.Background:SetVertexColor(hr, hg, hb, 1)
 		end
 
-		if self.overshieldBar and self.overshieldBar.Background then
-			self.overshieldBar.Background:SetVertexColor(hr, hg, hb, 1)
+		if self.overshieldBar then
+			local oc = db.Overshield and db.Overshield.Color
+			local ocr = (oc and oc[1]) or 1
+			local ocg = (oc and oc[2]) or 1
+			local ocb = (oc and oc[3]) or 1
+			self.overshieldBar:SetStatusBarColor(ocr, ocg, ocb, 1)
+			if self.overshieldBar.Background then
+				self.overshieldBar.Background:SetVertexColor(ocr, ocg, ocb, 1)
+			end
 		end
 
 		if self.powerBar then

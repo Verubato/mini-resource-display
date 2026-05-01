@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.3.0
+
+Added incoming health prediction.
+
 ## 2.2.0
 
 Added shield colouring support to the undershields too.

@@ -320,6 +320,11 @@ local function CreateBarGroup(unit, containerName, hasPower, getPositionDb, save
 				if self.absorbZoneBgFrame then self.absorbZoneBgFrame:SetAlphaFromBoolean(clamped, 0, 1) end
 				self.overshieldBar:SetValue(totalAbsorbs)
 				self.overshieldBar:SetAlphaFromBoolean(clamped, overshieldOpacity, 0)
+				if self.incomingHealBar then
+					local incomingAmount = self.healPredictionCalc:GetIncomingHeals()
+					self.incomingHealBar:SetMinMaxValues(0, missingHealth)
+					self.incomingHealBar:SetValue(incomingAmount)
+				end
 			else
 				-- Legacy: values are non-secret numbers, direct math is safe
 				local hp = UnitHealth(self.unit) or 0
@@ -333,6 +338,11 @@ local function CreateBarGroup(unit, containerName, hasPower, getPositionDb, save
 				if self.absorbZoneBgFrame then self.absorbZoneBgFrame:SetAlpha(hasOvershield and 0 or 1) end
 				self.overshieldBar:SetValue(math.max(0, totalAbsorbs - remaining))
 				self.overshieldBar:SetAlpha(hasOvershield and overshieldOpacity or 0)
+				if self.incomingHealBar then
+					local incomingHeals = UnitGetIncomingHeals and UnitGetIncomingHeals(self.unit) or 0
+					self.incomingHealBar:SetMinMaxValues(0, remaining)
+					self.incomingHealBar:SetValue(math.min(incomingHeals, remaining))
+				end
 			end
 		end
 	end
@@ -413,6 +423,16 @@ local function CreateBarGroup(unit, containerName, hasPower, getPositionDb, save
 			end
 		end
 
+		if self.incomingHealBar then
+			local ihc = db.IncomingHealColor
+			self.incomingHealBar:SetStatusBarColor(
+				(ihc and ihc[1]) or 0,
+				(ihc and ihc[2]) or 1,
+				(ihc and ihc[3]) or 0,
+				1
+			)
+		end
+
 		if self.powerBar then
 			local r, g, b = GetPowerColor()
 			SetBarColor(self.powerBar, r, g, b)
@@ -456,6 +476,15 @@ local function CreateBarGroup(unit, containerName, hasPower, getPositionDb, save
 
 			if texture and self.powerBar.Background then
 				self.powerBar.Background:SetTexture(texture)
+			end
+		end
+
+		if texture and self.incomingHealBar then
+			self.incomingHealBar:SetStatusBarTexture(texture)
+			local ihTex = self.incomingHealBar:GetStatusBarTexture()
+			if ihTex then
+				ihTex:SetHorizTile(false)
+				ihTex:SetVertTile(false)
 			end
 		end
 
@@ -519,6 +548,10 @@ local function CreateBarGroup(unit, containerName, hasPower, getPositionDb, save
 		self.healthBar = CreateFrame("StatusBar", nil, self.container)
 		self.healthBar.Background = CreateBackground(self.healthBar)
 
+		-- Created before absorb zone frames so absorb zone renders on top within the same frame level
+		self.incomingHealBar = CreateFrame("StatusBar", nil, self.container)
+		self.incomingHealBar:SetStatusBarColor(0, 1, 0, 1)
+
 		self.regularAbsorbBar = CreateFrame("StatusBar", nil, self.container)
 		self.regularAbsorbBar:SetStatusBarTexture("Interface\\RaidFrame\\Shield-Overlay")
 
@@ -572,8 +605,10 @@ local function CreateBarGroup(unit, containerName, hasPower, getPositionDb, save
 
 		self:UpdateTextures()
 
-		-- Anchor the regular absorb bar to the right edge of the health bar fill texture.
-		-- As health changes the fill texture resizes, so this automatically tracks health end.
+		-- Anchor bars to the right edge of the health bar fill texture so they auto-track health changes.
+		self.incomingHealBar:SetPoint("TOPLEFT", self.healthBar:GetStatusBarTexture(), "TOPRIGHT", 0, 0)
+		self.incomingHealBar:SetPoint("BOTTOMRIGHT", self.healthBar, "BOTTOMRIGHT", 0, 0)
+
 		self.regularAbsorbBar:SetPoint("TOPLEFT", self.healthBar:GetStatusBarTexture(), "TOPRIGHT", 0, 0)
 		self.regularAbsorbBar:SetPoint("BOTTOMRIGHT", self.healthBar, "BOTTOMRIGHT", 0, 0)
 
@@ -585,15 +620,19 @@ local function CreateBarGroup(unit, containerName, hasPower, getPositionDb, save
 		if CreateUnitHealPredictionCalculator then
 			self.healPredictionCalc = CreateUnitHealPredictionCalculator()
 			self.healPredictionCalc:SetDamageAbsorbClampMode(Enum.UnitDamageAbsorbClampMode.MissingHealth)
+			if Enum.UnitIncomingHealClampMode then
+				self.healPredictionCalc:SetIncomingHealClampMode(Enum.UnitIncomingHealClampMode.MissingHealth)
+			end
 		end
 
 		local baseLevel = self.container:GetFrameLevel() or 0
 		self.healthBar:SetFrameLevel(baseLevel + 1)
 		if self.powerBar then self.powerBar:SetFrameLevel(baseLevel + 1) end
-		-- Must be above healthBar so its background isn't covered by healthBar's dark background
+		self.incomingHealBar:SetFrameLevel(baseLevel + 1)
+		if self.absorbZoneBgFrame then self.absorbZoneBgFrame:SetFrameLevel(baseLevel + 1) end
+		-- Shield bars above so they render on top of the incoming heal bar and absorb zone backing
 		self.overshieldBar:SetFrameLevel(baseLevel + 2)
 		self.regularAbsorbBar:SetFrameLevel(baseLevel + 2)
-		if self.absorbZoneBgFrame then self.absorbZoneBgFrame:SetFrameLevel(baseLevel + 1) end
 
 		if db.Border then
 			self.healthBar.Outline = AddBlackOutline(self.healthBar)
@@ -698,7 +737,8 @@ local function OnEvent(_, event, arg1)
 		return
 	end
 
-	if event == "UNIT_ABSORB_AMOUNT_CHANGED" or event == "UNIT_HEAL_ABSORB_AMOUNT_CHANGED" then
+	if event == "UNIT_ABSORB_AMOUNT_CHANGED" or event == "UNIT_HEAL_ABSORB_AMOUNT_CHANGED"
+	or event == "UNIT_HEAL_PREDICTION" then
 		if arg1 == "player" then
 			playerGroup:UpdateAbsorb()
 		elseif arg1 == "pet" then
@@ -747,6 +787,7 @@ local function OnAddonLoaded()
 				eventsFrame:RegisterUnitEvent("UNIT_DISPLAYPOWER", "player")
 				eventsFrame:RegisterUnitEvent("UNIT_ABSORB_AMOUNT_CHANGED", "player", "pet")
 				eventsFrame:RegisterUnitEvent("UNIT_HEAL_ABSORB_AMOUNT_CHANGED", "player", "pet")
+				eventsFrame:RegisterUnitEvent("UNIT_HEAL_PREDICTION", "player", "pet")
 			else
 				eventsFrame:RegisterEvent("UNIT_HEALTH")
 				eventsFrame:RegisterEvent("UNIT_POWER_UPDATE")
@@ -754,6 +795,7 @@ local function OnAddonLoaded()
 				eventsFrame:RegisterEvent("UNIT_DISPLAYPOWER")
 				eventsFrame:RegisterEvent("UNIT_ABSORB_AMOUNT_CHANGED")
 				eventsFrame:RegisterEvent("UNIT_HEAL_ABSORB_AMOUNT_CHANGED")
+				eventsFrame:RegisterEvent("UNIT_HEAL_PREDICTION")
 			end
 
 			eventsFrame:SetScript("OnEvent", OnEvent)

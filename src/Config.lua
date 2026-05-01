@@ -56,6 +56,8 @@ local dbDefaults = {
 		Opacity = 1,
 	},
 
+	IncomingHealColor = { 0, 1, 0 },
+
 	Pet = {
 		Point = "CENTER",
 		RelativeTo = "UIParent",
@@ -487,6 +489,104 @@ function M:Init()
 	end)
 
 	overshieldPanel:HookScript("OnShow", UpdateOSSwatch)
+
+	-- Incoming Heals subcategory
+	local ihPanel = CreateFrame("Frame")
+	ihPanel.name = "Incoming Heals"
+	mini:AddSubCategory(category, ihPanel)
+
+	local ihTitle = ihPanel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
+	ihTitle:SetPoint("TOPLEFT", 0, -16)
+	ihTitle:SetText("Incoming Heals")
+
+	local ihSubtitle = ihPanel:CreateFontString(nil, "ARTWORK", "GameFontWhite")
+	ihSubtitle:SetPoint("TOPLEFT", ihTitle, "BOTTOMLEFT", 0, -6)
+	ihSubtitle:SetText("Configure the colour of the incoming heal prediction bar.")
+
+	local ihDivider = mini:Divider({
+		Parent = ihPanel,
+		Text = "Colour",
+	})
+
+	ihDivider:SetPoint("TOP", ihSubtitle, "BOTTOM", 0, -verticalSpacing)
+	ihDivider:SetPoint("LEFT", ihPanel, "LEFT")
+	ihDivider:SetPoint("RIGHT", ihPanel, "RIGHT", -horizontalSpacing, 0)
+
+	local ihSwatchLabel = ihPanel:CreateFontString(nil, "ARTWORK", "GameFontWhite")
+	ihSwatchLabel:SetPoint("TOPLEFT", ihDivider, "BOTTOMLEFT", 0, -verticalSpacing)
+	ihSwatchLabel:SetText("Colour")
+
+	local ihSwatch = CreateFrame("Button", nil, ihPanel)
+	ihSwatch:SetSize(24, 24)
+	ihSwatch:SetPoint("LEFT", ihSwatchLabel, "RIGHT", 8, 0)
+
+	local ihSwatchTex = ihSwatch:CreateTexture(nil, "BACKGROUND")
+	ihSwatchTex:SetAllPoints(true)
+
+	local ihSwatchBorder = CreateFrame("Frame", nil, ihSwatch, "BackdropTemplate")
+	ihSwatchBorder:SetAllPoints(true)
+	ihSwatchBorder:SetFrameLevel(ihSwatch:GetFrameLevel() + 1)
+	ihSwatchBorder:SetBackdrop({
+		edgeFile = "Interface\\Buttons\\WHITE8X8",
+		edgeSize = 1,
+	})
+	ihSwatchBorder:SetBackdropBorderColor(1, 1, 1, 1)
+
+	local ihSwatchHint = ihPanel:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
+	ihSwatchHint:SetPoint("LEFT", ihSwatch, "RIGHT", 8, 0)
+	ihSwatchHint:SetText("Click to change colour")
+
+	ihSwatch:SetScript("OnEnter", function(self)
+		ihSwatchBorder:SetBackdropBorderColor(1, 0.82, 0, 1)
+		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+		GameTooltip:SetText("Click to change colour", 1, 1, 1)
+		GameTooltip:Show()
+	end)
+
+	ihSwatch:SetScript("OnLeave", function()
+		ihSwatchBorder:SetBackdropBorderColor(1, 1, 1, 1)
+		GameTooltip:Hide()
+	end)
+
+	local function UpdateIHSwatch()
+		local c = db.IncomingHealColor
+		ihSwatchTex:SetColorTexture(c[1] or 0, c[2] or 1, c[3] or 0, 1)
+	end
+
+	UpdateIHSwatch()
+
+	ihSwatch:SetScript("OnClick", function()
+		local c = db.IncomingHealColor
+
+		local function OnChanged()
+			local r, g, b = ColorPickerFrame:GetColorRGB()
+			db.IncomingHealColor[1] = r
+			db.IncomingHealColor[2] = g
+			db.IncomingHealColor[3] = b
+			UpdateIHSwatch()
+			addon:Reload()
+		end
+
+		local function OnCancel()
+			local r, g, b = ColorPickerFrame:GetPreviousValues()
+			db.IncomingHealColor[1] = r
+			db.IncomingHealColor[2] = g
+			db.IncomingHealColor[3] = b
+			UpdateIHSwatch()
+			addon:Reload()
+		end
+
+		ColorPickerFrame:SetupColorPickerAndShow({
+			swatchFunc = OnChanged,
+			cancelFunc = OnCancel,
+			hasOpacity = false,
+			r = c[1] or 0,
+			g = c[2] or 1,
+			b = c[3] or 0,
+		})
+	end)
+
+	ihPanel:HookScript("OnShow", UpdateIHSwatch)
 
 	SLASH_MINIRESOURCEDISPLAY1 = "/mrd"
 	SLASH_MINIRESOURCEDISPLAY2 = "/minird"

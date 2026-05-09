@@ -115,7 +115,7 @@ local function CreateBarGroup(unit, containerName, hasPower, getPositionDb, save
 
 		c.FadeIn:SetScript("OnFinished", function()
 			if c.IsShowing then
-				c:SetAlpha(1)
+				c:SetAlpha(c.TargetAlpha or 1)
 			end
 		end)
 
@@ -135,16 +135,18 @@ local function CreateBarGroup(unit, containerName, hasPower, getPositionDb, save
 		end)
 	end
 
-	function group:FadeTo(show)
+	function group:FadeTo(show, targetAlpha)
 		self:SetupFadeAnimations()
 
 		local c = self.container
+		targetAlpha = show and (targetAlpha or 1) or 0
 
-		if c.IsShowing == show then
+		if c.IsShowing == show and (c.TargetAlpha or 1) == targetAlpha then
 			return
 		end
 
 		c.IsShowing = show and true or false
+		c.TargetAlpha = targetAlpha
 
 		if show then
 			if c.FadeOut and c.FadeOut:IsPlaying() then
@@ -153,13 +155,13 @@ local function CreateBarGroup(unit, containerName, hasPower, getPositionDb, save
 
 			if c.FadeIn and c.FadeIn.Alpha then
 				c.FadeIn.Alpha:SetDuration(db.FadeInDuration or 1)
-				c.FadeIn.Alpha:SetFromAlpha(0)
-				c.FadeIn.Alpha:SetToAlpha(1)
+				c.FadeIn.Alpha:SetFromAlpha(c:GetAlpha())
+				c.FadeIn.Alpha:SetToAlpha(targetAlpha)
 
 				c.FadeIn:Stop()
 				c.FadeIn:Play()
 			else
-				c:SetAlpha(1)
+				c:SetAlpha(targetAlpha)
 				c:Show()
 			end
 		else
@@ -520,7 +522,9 @@ local function CreateBarGroup(unit, containerName, hasPower, getPositionDb, save
 		end
 
 		if db.AlwaysShow then
-			self:FadeTo(true)
+			local inCombat = UnitAffectingCombat("player")
+			local targetAlpha = inCombat and 1 or (db.OutOfCombatOpacity or 1)
+			self:FadeTo(true, targetAlpha)
 			return
 		end
 

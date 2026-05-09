@@ -38,6 +38,7 @@ local dbDefaults = {
 	PowerUseTypeColor = true,
 
 	AlwaysShow = false,
+	OutOfCombatOpacity = 1,
 
 	UsePercent = false,
 
@@ -587,6 +588,50 @@ function M:Init()
 	end)
 
 	ihPanel:HookScript("OnShow", UpdateIHSwatch)
+
+	-- Misc subcategory
+	local miscPanel = CreateFrame("Frame")
+	miscPanel.name = "Misc"
+	mini:AddSubCategory(category, miscPanel)
+
+	local miscTitle = miscPanel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
+	miscTitle:SetPoint("TOPLEFT", 0, -16)
+	miscTitle:SetText("Misc")
+
+	local miscSubtitle = miscPanel:CreateFontString(nil, "ARTWORK", "GameFontWhite")
+	miscSubtitle:SetPoint("TOPLEFT", miscTitle, "BOTTOMLEFT", 0, -6)
+	miscSubtitle:SetText("Miscellaneous settings.")
+
+	local miscDivider = mini:Divider({
+		Parent = miscPanel,
+		Text = "Visibility",
+	})
+
+	miscDivider:SetPoint("TOP", miscSubtitle, "BOTTOM", 0, -verticalSpacing)
+	miscDivider:SetPoint("LEFT", miscPanel, "LEFT")
+	miscDivider:SetPoint("RIGHT", miscPanel, "RIGHT", -horizontalSpacing, 0)
+
+	local outOfCombatOpacityLabel = miscPanel:CreateFontString(nil, "ARTWORK", "GameFontWhite")
+	outOfCombatOpacityLabel:SetPoint("TOPLEFT", miscDivider, "BOTTOMLEFT", 0, -verticalSpacing)
+	outOfCombatOpacityLabel:SetText("Out of combat opacity")
+
+	local outOfCombatOpacitySlider = mini:Slider({
+		Parent = miscPanel,
+		Min = 0,
+		Max = 1,
+		Step = 0.05,
+		Width = sliderWidth,
+		Tooltip = "Alpha opacity of the bars when out of combat. Only applies when 'Always show' is enabled.",
+		GetValue = function()
+			return db.OutOfCombatOpacity or 1
+		end,
+		SetValue = function(value)
+			db.OutOfCombatOpacity = math.max(0, math.min(1, value))
+			addon:Reload()
+		end,
+	})
+
+	outOfCombatOpacitySlider.Slider:SetPoint("TOPLEFT", outOfCombatOpacityLabel, "BOTTOMLEFT", 0, -verticalSpacing * 3)
 
 	SLASH_MINIRESOURCEDISPLAY1 = "/mrd"
 	SLASH_MINIRESOURCEDISPLAY2 = "/minird"

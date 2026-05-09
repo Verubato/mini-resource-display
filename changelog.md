@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.4.0
+
+Added out of combat opacity slider (in misc settings panel).
+
 ## 2.3.0
 
 Added incoming health prediction.

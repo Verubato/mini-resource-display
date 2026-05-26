@@ -298,7 +298,7 @@ function M:Init()
 	local textSizeSlider = mini:Slider({
 		Parent = panel,
 		Min = 8,
-		Max = 20,
+		Max = 32,
 		Step = 1,
 		Width = sliderWidth,
 		LabelText = "Text Size",
@@ -306,7 +306,7 @@ function M:Init()
 			return db.FontSize
 		end,
 		SetValue = function(value)
-			db.FontSize = mini:ClampInt(value, 8, 20, dbDefaults.FontSize)
+			db.FontSize = mini:ClampInt(value, 8, 32, dbDefaults.FontSize)
 			addon:Reload()
 		end,
 	})

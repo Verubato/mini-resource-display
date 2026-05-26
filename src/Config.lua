@@ -39,6 +39,7 @@ local dbDefaults = {
 
 	AlwaysShow = false,
 	OutOfCombatOpacity = 1,
+	HideTextSuffix = false,
 
 	UsePercent = false,
 
@@ -632,6 +633,21 @@ function M:Init()
 	})
 
 	outOfCombatOpacitySlider.Slider:SetPoint("TOPLEFT", outOfCombatOpacityLabel, "BOTTOMLEFT", 0, -verticalSpacing * 3)
+
+	local hideTextSuffixChk = mini:Checkbox({
+		Parent = miscPanel,
+		LabelText = "Hide text suffix",
+		Tooltip = "Hides suffixes on bar text, such as '%' for percentages and 'K' for large numbers.",
+		GetValue = function()
+			return db.HideTextSuffix
+		end,
+		SetValue = function(value)
+			db.HideTextSuffix = value
+			addon:Reload()
+		end,
+	})
+
+	hideTextSuffixChk:SetPoint("TOPLEFT", outOfCombatOpacitySlider.Slider, "BOTTOMLEFT", 0, -verticalSpacing * 2)
 
 	SLASH_MINIRESOURCEDISPLAY1 = "/mrd"
 	SLASH_MINIRESOURCEDISPLAY2 = "/minird"

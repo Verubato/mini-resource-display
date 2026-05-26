@@ -286,13 +286,13 @@ local function CreateBarGroup(unit, containerName, hasPower, getPositionDb, save
 						pct = math.floor((hp / max) * 100 + 0.5)
 					end
 				end
-				self.healthText:SetText(string.format("%d%%", pct))
+				local fmt = db.HideTextSuffix and "%d" or "%d%%"
+				self.healthText:SetText(string.format(fmt, pct))
 			else
 				local format = db.HealthTextFormat or "%s/%s"
-				local currentHpAbbreviated = AbbreviateNumbers(hp)
-				local maxHpAbbreviated = AbbreviateNumbers(max)
-
-				self.healthText:SetText(string.format(format, currentHpAbbreviated, maxHpAbbreviated))
+				local current = db.HideTextSuffix and hp or AbbreviateNumbers(hp)
+				local maximum = db.HideTextSuffix and max or AbbreviateNumbers(max)
+				self.healthText:SetText(string.format(format, current, maximum))
 			end
 		end
 
@@ -372,13 +372,13 @@ local function CreateBarGroup(unit, containerName, hasPower, getPositionDb, save
 						pct = math.floor((power / max) * 100 + 0.5)
 					end
 				end
-				self.powerText:SetText(string.format("%d%%", pct))
+				local fmt = db.HideTextSuffix and "%d" or "%d%%"
+				self.powerText:SetText(string.format(fmt, pct))
 			else
 				local format = db.PowerTextFormat or "%s/%s"
-				local currentPowerAbbreviated = AbbreviateNumbers(power)
-				local maxPowerAbbreviated = AbbreviateNumbers(max)
-
-				self.powerText:SetText(string.format(format, currentPowerAbbreviated, maxPowerAbbreviated))
+				local current = db.HideTextSuffix and power or AbbreviateNumbers(power)
+				local maximum = db.HideTextSuffix and max or AbbreviateNumbers(max)
+				self.powerText:SetText(string.format(format, current, maximum))
 			end
 		end
 	end

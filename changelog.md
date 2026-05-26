@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.5.0
+
+- Increased max font size from 20 to 32.
+- Added option to exclude showing the percentage/abbreviation suffix (in the misc panel).
+
 ## 2.4.0
 
 Added out of combat opacity slider (in misc settings panel).

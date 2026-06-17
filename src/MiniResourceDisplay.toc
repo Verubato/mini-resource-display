@@ -2,7 +2,7 @@
 ## Title: MiniResourceDisplay
 ## Notes: Simple personal resource-style health + power bar you can tweak.
 ## Author: Verz
-## Version: 2.5.0
+## Version: 2.5.1
 ## SavedVariables: MiniResourceDisplayDB
 ## IconTexture: Interface\AddOns\MiniResourceDisplay\Icon.blp
 ## X-Curse-Project-ID: 1418734

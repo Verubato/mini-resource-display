@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.5.1
+
+12.0.7 TOC bump.
+
 ## 2.5.0
 
 - Increased max font size from 20 to 32.

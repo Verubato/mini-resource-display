@@ -54,6 +54,7 @@ local dbDefaults = {
 	PetHeight = 15,
 
 	Shield = {
+		Enabled = true,
 		Color = { 1, 1, 1 },
 		Opacity = 1,
 	},
@@ -402,12 +403,27 @@ function M:Init()
 	osSubtitle:SetPoint("TOPLEFT", osTitle, "BOTTOMLEFT", 0, -6)
 	osSubtitle:SetText("Configure the colour and opacity of the shield bars.")
 
+	local osEnabledChk = mini:Checkbox({
+		Parent = overshieldPanel,
+		LabelText = "Show shields",
+		Tooltip = "Whether to show the absorb/shield indicator on the health bar.",
+		GetValue = function()
+			return db.Shield.Enabled
+		end,
+		SetValue = function(value)
+			db.Shield.Enabled = value
+			addon:Reload()
+		end,
+	})
+
+	osEnabledChk:SetPoint("TOPLEFT", osSubtitle, "BOTTOMLEFT", 0, -verticalSpacing)
+
 	local osDivider = mini:Divider({
 		Parent = overshieldPanel,
 		Text = "Colour & Opacity",
 	})
 
-	osDivider:SetPoint("TOP", osSubtitle, "BOTTOM", 0, -verticalSpacing)
+	osDivider:SetPoint("TOP", osEnabledChk, "BOTTOM", 0, -verticalSpacing)
 	osDivider:SetPoint("LEFT", overshieldPanel, "LEFT")
 	osDivider:SetPoint("RIGHT", overshieldPanel, "RIGHT", -horizontalSpacing, 0)
 

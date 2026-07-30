@@ -304,6 +304,13 @@ local function CreateBarGroup(unit, containerName, hasPower, getPositionDb, save
 			return
 		end
 
+		-- Hide rather than skip updates entirely, as the incoming heal bar is
+		-- updated in the same pass and should keep working with shields off
+		local shieldsEnabled = not db.Shield or db.Shield.Enabled ~= false
+		self.overshieldBar:SetShown(shieldsEnabled)
+		if self.regularAbsorbBar then self.regularAbsorbBar:SetShown(shieldsEnabled) end
+		if self.absorbZoneBgFrame then self.absorbZoneBgFrame:SetShown(shieldsEnabled) end
+
 		local maxHealth = UnitHealthMax(self.unit) or 0
 		local totalAbsorbs = UnitGetTotalAbsorbs(self.unit) or 0
 

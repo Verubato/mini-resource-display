@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.6.0
+
+Added an option to show/hide the absorb shield indicator (in the shield settings panel).
+
 ## 2.5.2
 
 12.1 version support

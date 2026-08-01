@@ -113,6 +113,37 @@ function M:Init()
 		return
 	end
 
+	-- Every panel is collected so a reset refreshes them all, not just whichever one happens
+	-- to be open; the rest would otherwise keep showing the old values until their next OnShow.
+	local panels = { panel }
+
+	local function ResetToDefaults()
+		db = mini:ResetSavedVars(dbDefaults)
+
+		for _, p in ipairs(panels) do
+			if p.MiniRefresh then
+				p:MiniRefresh()
+			end
+		end
+
+		addon:Reload()
+	end
+
+	-- Addon scoped so sibling Mini addons can't collide on the key.
+	local resetPopup = addonName:upper() .. "_RESET_DEFAULTS"
+
+	StaticPopupDialogs[resetPopup] = {
+		text = "Reset all " .. addonName .. " settings back to their defaults?",
+		button1 = YES,
+		button2 = NO,
+		OnAccept = ResetToDefaults,
+		timeout = 0,
+		whileDead = true,
+		hideOnEscape = true,
+		-- Keeps the popup off the stock frames Blizzard reuses, which can arrive tainted.
+		preferredIndex = 3,
+	}
+
 	local verticalSpacing = mini.VerticalSpacing
 	local horizontalSpacing = mini.HorizontalSpacing
 	local columns = 4
@@ -122,6 +153,18 @@ function M:Init()
 		Description = "Shows simple personal resource style health and power bars.",
 		Gap = 6,
 	})
+
+	local resetButton = mini:Button({
+		Parent = panel,
+		Text = "Reset to defaults",
+		Width = 140,
+		OnClick = function()
+			StaticPopup_Show(resetPopup)
+		end,
+	})
+
+	-- Level with the header title, inset to the same right edge the dividers use.
+	resetButton:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -horizontalSpacing, -verticalSpacing)
 
 	local mainDivider = mini:Divider({
 		Parent = panel,
@@ -403,10 +446,13 @@ function M:Init()
 	local overshieldPanel = CreateFrame("Frame")
 	overshieldPanel.name = "Shield"
 	mini:AddSubCategory(category, overshieldPanel)
+	panels[#panels + 1] = overshieldPanel
 
+	-- Version belongs on the main panel only; repeating it on every subcategory is noise.
 	local osHeader = mini:PanelHeader({
 		Parent = overshieldPanel,
 		Title = "Shield",
+		ShowVersion = false,
 		Description = "Configure the colour and opacity of the shield bars.",
 		Gap = 6,
 	})
@@ -474,10 +520,12 @@ function M:Init()
 	local ihPanel = CreateFrame("Frame")
 	ihPanel.name = "Incoming Heals"
 	mini:AddSubCategory(category, ihPanel)
+	panels[#panels + 1] = ihPanel
 
 	local ihHeader = mini:PanelHeader({
 		Parent = ihPanel,
 		Title = "Incoming Heals",
+		ShowVersion = false,
 		Description = "Configure the colour of the incoming heal prediction bar.",
 		Gap = 6,
 	})
@@ -532,10 +580,12 @@ function M:Init()
 		local tickerPanel = CreateFrame("Frame")
 		tickerPanel.name = "Power Tick"
 		mini:AddSubCategory(category, tickerPanel)
+		panels[#panels + 1] = tickerPanel
 
 		local tickerHeader = mini:PanelHeader({
 			Parent = tickerPanel,
 			Title = "Power Tick",
+			ShowVersion = false,
 			Description = "Shows when your next energy or mana regen tick will land.",
 			Gap = 6,
 		})
@@ -621,10 +671,12 @@ function M:Init()
 	local miscPanel = CreateFrame("Frame")
 	miscPanel.name = "Misc"
 	mini:AddSubCategory(category, miscPanel)
+	panels[#panels + 1] = miscPanel
 
 	local miscHeader = mini:PanelHeader({
 		Parent = miscPanel,
 		Title = "Misc",
+		ShowVersion = false,
 		Description = "Miscellaneous settings.",
 		Gap = 6,
 	})
@@ -681,9 +733,7 @@ function M:Init()
 		msg = (msg or ""):lower():match("^%s*(.-)%s*$")
 
 		if msg == "reset" then
-			db = mini:ResetSavedVars(dbDefaults)
-			panel:MiniRefresh()
-			addon:Reload()
+			ResetToDefaults()
 			return
 		elseif msg == "tick" and addon.PowerTick:IsSupported() then
 			for _, line in ipairs(addon.PowerTick:Describe()) do

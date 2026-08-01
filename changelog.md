@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.7.0
+
+New MiniFramework added across all my mini addons.
+
 ## 2.6.0
 
 Added an option to show/hide the absorb shield indicator (in the shield settings panel).

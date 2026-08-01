@@ -109,7 +109,6 @@ function M:Init()
 	local header = mini:PanelHeader({
 		Parent = panel,
 		Description = "Shows simple personal resource style health and power bars.",
-		Y = -verticalSpacing,
 		Gap = 6,
 	})
 
@@ -398,7 +397,6 @@ function M:Init()
 		Parent = overshieldPanel,
 		Title = "Shield",
 		Description = "Configure the colour and opacity of the shield bars.",
-		Y = -verticalSpacing,
 		Gap = 6,
 	})
 
@@ -466,7 +464,6 @@ function M:Init()
 		Parent = ihPanel,
 		Title = "Incoming Heals",
 		Description = "Configure the colour of the incoming heal prediction bar.",
-		Y = -verticalSpacing,
 		Gap = 6,
 	})
 
@@ -519,7 +516,6 @@ function M:Init()
 		Parent = miscPanel,
 		Title = "Misc",
 		Description = "Miscellaneous settings.",
-		Y = -verticalSpacing,
 		Gap = 6,
 	})
 

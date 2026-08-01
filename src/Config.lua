@@ -444,6 +444,10 @@ function M:Init()
 		end,
 	})
 
+	-- The swatch anchors its own label to its right by default; this panel wants it on
+	-- the left, so drop that point before re-anchoring - leaving it would make the
+	-- label and the swatch depend on each other.
+	osSwatch.Label:ClearAllPoints()
 	osSwatch.Label:SetPoint("TOPLEFT", osDivider, "BOTTOMLEFT", 0, -verticalSpacing)
 	osSwatch:SetPoint("LEFT", osSwatch.Label, "RIGHT", 8, 0)
 
@@ -496,6 +500,10 @@ function M:Init()
 		end,
 	})
 
+	-- The swatch anchors its own label to its right by default; this panel wants it on
+	-- the left, so drop that point before re-anchoring - leaving it would make the
+	-- label and the swatch depend on each other.
+	ihSwatch.Label:ClearAllPoints()
 	ihSwatch.Label:SetPoint("TOPLEFT", ihDivider, "BOTTOMLEFT", 0, -verticalSpacing)
 	ihSwatch:SetPoint("LEFT", ihSwatch.Label, "RIGHT", 8, 0)
 

@@ -538,7 +538,6 @@ function M:Init()
 		Max = 1,
 		Step = 0.05,
 		Width = sliderWidth,
-		Tooltip = "Alpha opacity of the bars when out of combat. Only applies when 'Always show' is enabled.",
 		GetValue = function()
 			return db.OutOfCombatOpacity or 1
 		end,

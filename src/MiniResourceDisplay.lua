@@ -11,14 +11,6 @@ local db
 local playerGroup
 local petGroup
 
-local function SafeGetRelativeFrame(name)
-	if type(name) ~= "string" or name == "" then
-		return UIParent
-	end
-
-	return _G[name] or UIParent
-end
-
 local function GetConfiguredTexture()
 	if db.Texture == "Blizzard" then
 		return fallbackTexture
@@ -89,8 +81,7 @@ end
 -- Creates a self-contained bar group for a WoW unit.
 -- hasPower: whether this group includes a power bar (player=true, pet=false)
 -- getPositionDb: function() → table with Point/RelativeTo/RelativePoint/X/Y/Locked
--- savePosition: function(point, relativePoint, x, y)
-local function CreateBarGroup(unit, containerName, hasPower, getPositionDb, savePosition)
+local function CreateBarGroup(unit, containerName, hasPower, getPositionDb)
 	local group = {
 		unit = unit,
 		hasPower = hasPower,
@@ -185,16 +176,9 @@ local function CreateBarGroup(unit, containerName, hasPower, getPositionDb, save
 
 	function group:ApplyPosition()
 		local pos = getPositionDb()
-		self.container:ClearAllPoints()
-		self.container:SetPoint(
-			pos.Point or "CENTER",
-			SafeGetRelativeFrame(pos.RelativeTo),
-			pos.RelativePoint or "CENTER",
-			pos.X or 0,
-			pos.Y or 0
-		)
-		self.container:EnableMouse(not pos.Locked)
-		self.container:SetMovable(not pos.Locked)
+
+		mini:ApplyPosition(self.container, pos)
+		mini:SetPositionLocked(self.container, pos.Locked)
 	end
 
 	function group:UpdateSizes()
@@ -540,16 +524,12 @@ local function CreateBarGroup(unit, containerName, hasPower, getPositionDb, save
 
 	function group:Load()
 		self.container = CreateFrame("Frame", containerName, UIParent, "BackdropTemplate")
-		self.container:SetClampedToScreen(true)
-		self.container:EnableMouse(true)
-		self.container:SetMovable(true)
-		self.container:RegisterForDrag("LeftButton")
-		self.container:SetScript("OnDragStart", self.container.StartMoving)
-		self.container:SetScript("OnDragStop", function(c)
-			c:StopMovingOrSizing()
-			local point, _, relativePoint, x, y = c:GetPoint(1)
-			savePosition(point, relativePoint, x, y)
-		end)
+
+		mini:MakeMovable(self.container, getPositionDb(), {
+			IsLocked = function()
+				return getPositionDb().Locked and true or false
+			end,
+		})
 
 		self.container:SetAlpha(0)
 		self.container:Hide()
@@ -683,32 +663,10 @@ local function CreateBarGroup(unit, containerName, hasPower, getPositionDb, save
 end
 
 local function Load()
-	playerGroup = CreateBarGroup(
-		"player",
-		addonName .. "Frame",
-		true,
-		function() return db end,
-		function(point, relativePoint, x, y)
-			db.Point = point
-			db.RelativePoint = relativePoint
-			db.X = math.floor((x or 0) + 0.5)
-			db.Y = math.floor((y or 0) + 0.5)
-		end
-	)
+	playerGroup = CreateBarGroup("player", addonName .. "Frame", true, function() return db end)
 	playerGroup:Load()
 
-	petGroup = CreateBarGroup(
-		"pet",
-		addonName .. "PetFrame",
-		false,
-		function() return db.Pet end,
-		function(point, relativePoint, x, y)
-			db.Pet.Point = point
-			db.Pet.RelativePoint = relativePoint
-			db.Pet.X = math.floor((x or 0) + 0.5)
-			db.Pet.Y = math.floor((y or 0) + 0.5)
-		end
-	)
+	petGroup = CreateBarGroup("pet", addonName .. "PetFrame", false, function() return db.Pet end)
 	petGroup:Load()
 
 	addon:Reload()

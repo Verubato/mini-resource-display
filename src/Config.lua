@@ -106,20 +106,19 @@ function M:Init()
 	local horizontalSpacing = mini.HorizontalSpacing
 	local columns = 4
 	local columnStep = mini:ColumnWidth(columns, mini.HorizontalSpacing, 0)
-	local title = panel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
-	title:SetPoint("TOPLEFT", 0, -16)
-	title:SetText(addonName)
-
-	local subtitle = panel:CreateFontString(nil, "ARTWORK", "GameFontWhite")
-	subtitle:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -6)
-	subtitle:SetText("Shows simple personal resource style health and power bars.")
+	local header = mini:PanelHeader({
+		Parent = panel,
+		Description = "Shows simple personal resource style health and power bars.",
+		Y = -verticalSpacing,
+		Gap = 6,
+	})
 
 	local mainDivider = mini:Divider({
 		Parent = panel,
 		Text = "Settings",
 	})
 
-	mainDivider:SetPoint("TOP", subtitle, "BOTTOM", 0, -verticalSpacing)
+	mainDivider:SetPoint("TOP", header.Anchor, "BOTTOM", 0, -verticalSpacing)
 	mainDivider:SetPoint("LEFT", panel, "LEFT")
 	mainDivider:SetPoint("RIGHT", panel, "RIGHT", -horizontalSpacing, 0)
 
@@ -387,7 +386,7 @@ function M:Init()
 
 	panel:HookScript("OnShow", function()
 		-- refresh the items
-		textureDdl.Dropdown:MiniRefresh()
+		textureDdl:MiniRefresh()
 	end)
 
 	-- Shield subcategory
@@ -395,13 +394,13 @@ function M:Init()
 	overshieldPanel.name = "Shield"
 	mini:AddSubCategory(category, overshieldPanel)
 
-	local osTitle = overshieldPanel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
-	osTitle:SetPoint("TOPLEFT", 0, -16)
-	osTitle:SetText("Shield")
-
-	local osSubtitle = overshieldPanel:CreateFontString(nil, "ARTWORK", "GameFontWhite")
-	osSubtitle:SetPoint("TOPLEFT", osTitle, "BOTTOMLEFT", 0, -6)
-	osSubtitle:SetText("Configure the colour and opacity of the shield bars.")
+	local osHeader = mini:PanelHeader({
+		Parent = overshieldPanel,
+		Title = "Shield",
+		Description = "Configure the colour and opacity of the shield bars.",
+		Y = -verticalSpacing,
+		Gap = 6,
+	})
 
 	local osEnabledChk = mini:Checkbox({
 		Parent = overshieldPanel,
@@ -416,7 +415,7 @@ function M:Init()
 		end,
 	})
 
-	osEnabledChk:SetPoint("TOPLEFT", osSubtitle, "BOTTOMLEFT", 0, -verticalSpacing)
+	osEnabledChk:SetPoint("TOPLEFT", osHeader.Anchor, "BOTTOMLEFT", 0, -verticalSpacing)
 
 	local osDivider = mini:Divider({
 		Parent = overshieldPanel,
@@ -427,204 +426,109 @@ function M:Init()
 	osDivider:SetPoint("LEFT", overshieldPanel, "LEFT")
 	osDivider:SetPoint("RIGHT", overshieldPanel, "RIGHT", -horizontalSpacing, 0)
 
-	local osSwatchLabel = overshieldPanel:CreateFontString(nil, "ARTWORK", "GameFontWhite")
-	osSwatchLabel:SetPoint("TOPLEFT", osDivider, "BOTTOMLEFT", 0, -verticalSpacing)
-	osSwatchLabel:SetText("Colour")
-
-	local osSwatch = CreateFrame("Button", nil, overshieldPanel)
-	osSwatch:SetSize(24, 24)
-	osSwatch:SetPoint("LEFT", osSwatchLabel, "RIGHT", 8, 0)
-
-	local osSwatchTex = osSwatch:CreateTexture(nil, "BACKGROUND")
-	osSwatchTex:SetAllPoints(true)
-
-	local osSwatchBorder = CreateFrame("Frame", nil, osSwatch, "BackdropTemplate")
-	osSwatchBorder:SetAllPoints(true)
-	osSwatchBorder:SetFrameLevel(osSwatch:GetFrameLevel() + 1)
-	osSwatchBorder:SetBackdrop({
-		edgeFile = "Interface\\Buttons\\WHITE8X8",
-		edgeSize = 1,
+	local osSwatch = mini:ColorSwatch({
+		Parent = overshieldPanel,
+		LabelText = "Colour",
+		Tooltip = "Click to change colour and opacity",
+		Size = 24,
+		GetValue = function()
+			local c = db.Shield.Color
+			return c[1] or 1, c[2] or 1, c[3] or 1, db.Shield.Opacity or 1
+		end,
+		SetValue = function(r, g, b, a)
+			db.Shield.Color[1] = r
+			db.Shield.Color[2] = g
+			db.Shield.Color[3] = b
+			db.Shield.Opacity = a
+		end,
+		OnChange = function()
+			addon:Reload()
+		end,
 	})
-	osSwatchBorder:SetBackdropBorderColor(1, 1, 1, 1)
+
+	osSwatch.Label:SetPoint("TOPLEFT", osDivider, "BOTTOMLEFT", 0, -verticalSpacing)
+	osSwatch:SetPoint("LEFT", osSwatch.Label, "RIGHT", 8, 0)
 
 	local osSwatchHint = overshieldPanel:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
 	osSwatchHint:SetPoint("LEFT", osSwatch, "RIGHT", 8, 0)
 	osSwatchHint:SetText("Click to change colour and opacity")
 
-	osSwatch:SetScript("OnEnter", function(self)
-		osSwatchBorder:SetBackdropBorderColor(1, 0.82, 0, 1)
-		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-		GameTooltip:SetText("Click to change colour and opacity", 1, 1, 1)
-		GameTooltip:Show()
+	overshieldPanel:HookScript("OnShow", function()
+		osSwatch:MiniRefresh()
 	end)
-
-	osSwatch:SetScript("OnLeave", function()
-		osSwatchBorder:SetBackdropBorderColor(1, 1, 1, 1)
-		GameTooltip:Hide()
-	end)
-
-	local function UpdateOSSwatch()
-		local c = db.Shield.Color
-		osSwatchTex:SetColorTexture(c[1] or 1, c[2] or 1, c[3] or 1, 1)
-	end
-
-	UpdateOSSwatch()
-
-	osSwatch:SetScript("OnClick", function()
-		local c = db.Shield.Color
-
-		local function OnChanged()
-			local r, g, b = ColorPickerFrame:GetColorRGB()
-			local a = ColorPickerFrame:GetColorAlpha()
-			db.Shield.Color[1] = r
-			db.Shield.Color[2] = g
-			db.Shield.Color[3] = b
-			db.Shield.Opacity = a
-			UpdateOSSwatch()
-			addon:Reload()
-		end
-
-		local function OnCancel()
-			local r, g, b, a = ColorPickerFrame:GetPreviousValues()
-			db.Shield.Color[1] = r
-			db.Shield.Color[2] = g
-			db.Shield.Color[3] = b
-			db.Shield.Opacity = a
-			UpdateOSSwatch()
-			addon:Reload()
-		end
-
-		ColorPickerFrame:SetupColorPickerAndShow({
-			swatchFunc = OnChanged,
-			opacityFunc = OnChanged,
-			cancelFunc = OnCancel,
-			hasOpacity = true,
-			opacity = db.Shield.Opacity or 1,
-			r = c[1] or 1,
-			g = c[2] or 1,
-			b = c[3] or 1,
-		})
-	end)
-
-	overshieldPanel:HookScript("OnShow", UpdateOSSwatch)
 
 	-- Incoming Heals subcategory
 	local ihPanel = CreateFrame("Frame")
 	ihPanel.name = "Incoming Heals"
 	mini:AddSubCategory(category, ihPanel)
 
-	local ihTitle = ihPanel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
-	ihTitle:SetPoint("TOPLEFT", 0, -16)
-	ihTitle:SetText("Incoming Heals")
-
-	local ihSubtitle = ihPanel:CreateFontString(nil, "ARTWORK", "GameFontWhite")
-	ihSubtitle:SetPoint("TOPLEFT", ihTitle, "BOTTOMLEFT", 0, -6)
-	ihSubtitle:SetText("Configure the colour of the incoming heal prediction bar.")
+	local ihHeader = mini:PanelHeader({
+		Parent = ihPanel,
+		Title = "Incoming Heals",
+		Description = "Configure the colour of the incoming heal prediction bar.",
+		Y = -verticalSpacing,
+		Gap = 6,
+	})
 
 	local ihDivider = mini:Divider({
 		Parent = ihPanel,
 		Text = "Colour",
 	})
 
-	ihDivider:SetPoint("TOP", ihSubtitle, "BOTTOM", 0, -verticalSpacing)
+	ihDivider:SetPoint("TOP", ihHeader.Anchor, "BOTTOM", 0, -verticalSpacing)
 	ihDivider:SetPoint("LEFT", ihPanel, "LEFT")
 	ihDivider:SetPoint("RIGHT", ihPanel, "RIGHT", -horizontalSpacing, 0)
 
-	local ihSwatchLabel = ihPanel:CreateFontString(nil, "ARTWORK", "GameFontWhite")
-	ihSwatchLabel:SetPoint("TOPLEFT", ihDivider, "BOTTOMLEFT", 0, -verticalSpacing)
-	ihSwatchLabel:SetText("Colour")
-
-	local ihSwatch = CreateFrame("Button", nil, ihPanel)
-	ihSwatch:SetSize(24, 24)
-	ihSwatch:SetPoint("LEFT", ihSwatchLabel, "RIGHT", 8, 0)
-
-	local ihSwatchTex = ihSwatch:CreateTexture(nil, "BACKGROUND")
-	ihSwatchTex:SetAllPoints(true)
-
-	local ihSwatchBorder = CreateFrame("Frame", nil, ihSwatch, "BackdropTemplate")
-	ihSwatchBorder:SetAllPoints(true)
-	ihSwatchBorder:SetFrameLevel(ihSwatch:GetFrameLevel() + 1)
-	ihSwatchBorder:SetBackdrop({
-		edgeFile = "Interface\\Buttons\\WHITE8X8",
-		edgeSize = 1,
+	local ihSwatch = mini:ColorSwatch({
+		Parent = ihPanel,
+		LabelText = "Colour",
+		Tooltip = "Click to change colour",
+		Size = 24,
+		HasOpacity = false,
+		GetValue = function()
+			local c = db.IncomingHealColor
+			return c[1] or 0, c[2] or 1, c[3] or 0, 1
+		end,
+		SetValue = function(r, g, b)
+			db.IncomingHealColor[1] = r
+			db.IncomingHealColor[2] = g
+			db.IncomingHealColor[3] = b
+		end,
+		OnChange = function()
+			addon:Reload()
+		end,
 	})
-	ihSwatchBorder:SetBackdropBorderColor(1, 1, 1, 1)
+
+	ihSwatch.Label:SetPoint("TOPLEFT", ihDivider, "BOTTOMLEFT", 0, -verticalSpacing)
+	ihSwatch:SetPoint("LEFT", ihSwatch.Label, "RIGHT", 8, 0)
 
 	local ihSwatchHint = ihPanel:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
 	ihSwatchHint:SetPoint("LEFT", ihSwatch, "RIGHT", 8, 0)
 	ihSwatchHint:SetText("Click to change colour")
 
-	ihSwatch:SetScript("OnEnter", function(self)
-		ihSwatchBorder:SetBackdropBorderColor(1, 0.82, 0, 1)
-		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-		GameTooltip:SetText("Click to change colour", 1, 1, 1)
-		GameTooltip:Show()
+	ihPanel:HookScript("OnShow", function()
+		ihSwatch:MiniRefresh()
 	end)
-
-	ihSwatch:SetScript("OnLeave", function()
-		ihSwatchBorder:SetBackdropBorderColor(1, 1, 1, 1)
-		GameTooltip:Hide()
-	end)
-
-	local function UpdateIHSwatch()
-		local c = db.IncomingHealColor
-		ihSwatchTex:SetColorTexture(c[1] or 0, c[2] or 1, c[3] or 0, 1)
-	end
-
-	UpdateIHSwatch()
-
-	ihSwatch:SetScript("OnClick", function()
-		local c = db.IncomingHealColor
-
-		local function OnChanged()
-			local r, g, b = ColorPickerFrame:GetColorRGB()
-			db.IncomingHealColor[1] = r
-			db.IncomingHealColor[2] = g
-			db.IncomingHealColor[3] = b
-			UpdateIHSwatch()
-			addon:Reload()
-		end
-
-		local function OnCancel()
-			local r, g, b = ColorPickerFrame:GetPreviousValues()
-			db.IncomingHealColor[1] = r
-			db.IncomingHealColor[2] = g
-			db.IncomingHealColor[3] = b
-			UpdateIHSwatch()
-			addon:Reload()
-		end
-
-		ColorPickerFrame:SetupColorPickerAndShow({
-			swatchFunc = OnChanged,
-			cancelFunc = OnCancel,
-			hasOpacity = false,
-			r = c[1] or 0,
-			g = c[2] or 1,
-			b = c[3] or 0,
-		})
-	end)
-
-	ihPanel:HookScript("OnShow", UpdateIHSwatch)
 
 	-- Misc subcategory
 	local miscPanel = CreateFrame("Frame")
 	miscPanel.name = "Misc"
 	mini:AddSubCategory(category, miscPanel)
 
-	local miscTitle = miscPanel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
-	miscTitle:SetPoint("TOPLEFT", 0, -16)
-	miscTitle:SetText("Misc")
-
-	local miscSubtitle = miscPanel:CreateFontString(nil, "ARTWORK", "GameFontWhite")
-	miscSubtitle:SetPoint("TOPLEFT", miscTitle, "BOTTOMLEFT", 0, -6)
-	miscSubtitle:SetText("Miscellaneous settings.")
+	local miscHeader = mini:PanelHeader({
+		Parent = miscPanel,
+		Title = "Misc",
+		Description = "Miscellaneous settings.",
+		Y = -verticalSpacing,
+		Gap = 6,
+	})
 
 	local miscDivider = mini:Divider({
 		Parent = miscPanel,
 		Text = "Visibility",
 	})
 
-	miscDivider:SetPoint("TOP", miscSubtitle, "BOTTOM", 0, -verticalSpacing)
+	miscDivider:SetPoint("TOP", miscHeader.Anchor, "BOTTOM", 0, -verticalSpacing)
 	miscDivider:SetPoint("LEFT", miscPanel, "LEFT")
 	miscDivider:SetPoint("RIGHT", miscPanel, "RIGHT", -horizontalSpacing, 0)
 

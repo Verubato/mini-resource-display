@@ -12,6 +12,6 @@ Libs\LibStub\LibStub.lua
 Libs\CallbackHandler-1.0\CallbackHandler-1.0.lua
 Libs\LibSharedMedia-3.0\LibSharedMedia-3.0.lua
 Libs\LibUIDropDownMenu\LibUIDropDownMenu.lua
-MiniFramework.lua
+Libs\MiniFramework\MiniFramework.xml
 Config.lua
 MiniResourceDisplay.lua

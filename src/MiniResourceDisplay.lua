@@ -251,6 +251,8 @@ local function CreateBarGroup(unit, containerName, hasPower, getPositionDb)
 			self.healthText:SetShadowOffset(0, 0)
 			if self.powerText then self.powerText:SetShadowOffset(0, 0) end
 		end
+
+		self:UpdateTickerVisibility()
 	end
 
 	function group:UpdateHealth()
@@ -371,6 +373,83 @@ local function CreateBarGroup(unit, containerName, hasPower, getPositionDb)
 				local maximum = db.HideTextSuffix and max or AbbreviateNumbers(max)
 				self.powerText:SetText(string.format(format, current, maximum))
 			end
+		end
+	end
+
+	-- Renders the server's power regen tick. Classic-only: retail regen is continuous, so
+	-- these frames are never created there and the option never appears.
+	function group:CreateTicker()
+		-- Parented to the power bar so it inherits its visibility, and one level above it so
+		-- the marker draws over the fill but stays under the text frame.
+		self.tickFrame = CreateFrame("Frame", nil, self.powerBar)
+		self.tickFrame:SetAllPoints(self.powerBar)
+		self.tickFrame:SetFrameLevel((self.powerBar:GetFrameLevel() or 0) + 1)
+		self.tickFrame:Hide()
+
+		-- Deliberately a flat, fully opaque block with no edging. The marker sweeps across both
+		-- the filled bar and the dark empty part behind it, and anything that lets the
+		-- background through - translucency, or an edge colour that only contrasts with one of
+		-- them - makes it look like it changes as it crosses over. Legibility comes from the
+		-- colour instead, which is why the default contrasts with both.
+		self.tickSpark = self.tickFrame:CreateTexture(nil, "OVERLAY")
+		self.tickSpark:Hide()
+
+		-- Hiding the host frame stops the OnUpdate, so a disabled ticker - or a faded out
+		-- bar group - costs nothing per frame.
+		self.tickFrame:SetScript("OnUpdate", function()
+			self:UpdateTicker()
+		end)
+	end
+
+	function group:UpdateTicker()
+		if not self.tickFrame then
+			return
+		end
+
+		local ticker = db.Ticker
+		local progress = addon.PowerTick:GetProgress()
+
+		if not progress then
+			-- Full power, a power type that doesn't tick, or the cadence isn't known yet -
+			-- which covers the five second rule, since nothing arrives during it anyway.
+			self.tickSpark:Hide()
+			return
+		end
+
+		local color = ticker.Color
+		local r = (color and color[1]) or 1
+		local g = (color and color[2]) or 1
+		local b = (color and color[3]) or 1
+		local alpha = ticker.Opacity or 1
+
+		self.tickSpark:SetColorTexture(r, g, b, alpha)
+
+		local width = self.tickFrame:GetWidth() or 0
+		local thickness = ticker.Thickness or 2
+		-- Centred on the boundary, then held inside the bar so it doesn't hang off either end.
+		local offset = mini:ClampFloat(progress * width - thickness / 2, 0, math.max(0, width - thickness), 0)
+
+		self.tickSpark:SetWidth(thickness)
+		self.tickSpark:SetPoint("TOPLEFT", self.tickFrame, "TOPLEFT", offset, 0)
+		self.tickSpark:SetPoint("BOTTOMLEFT", self.tickFrame, "BOTTOMLEFT", offset, 0)
+		self.tickSpark:Show()
+	end
+
+	function group:UpdateTickerVisibility()
+		if not self.tickFrame then
+			return
+		end
+
+		local ticker = db.Ticker
+		local enabled = (ticker and ticker.Enabled and db.ShowPower ~= false) and true or false
+
+		-- The detector polls independently of this frame: it has to keep tracking the cadence
+		-- while the marker is hidden, which it is at full power and through the five second rule.
+		addon.PowerTick:SetEnabled(enabled)
+		self.tickFrame:SetShown(enabled)
+
+		if enabled then
+			self:UpdateTicker()
 		end
 	end
 
@@ -619,6 +698,7 @@ local function CreateBarGroup(unit, containerName, hasPower, getPositionDb)
 		local baseLevel = self.container:GetFrameLevel() or 0
 		self.healthBar:SetFrameLevel(baseLevel + 1)
 		if self.powerBar then self.powerBar:SetFrameLevel(baseLevel + 1) end
+		if self.powerBar and addon.PowerTick:IsSupported() then self:CreateTicker() end
 		self.incomingHealBar:SetFrameLevel(baseLevel + 1)
 		if self.absorbZoneBgFrame then self.absorbZoneBgFrame:SetFrameLevel(baseLevel + 1) end
 		-- Shield bars above so they render on top of the incoming heal bar and absorb zone backing
@@ -674,6 +754,9 @@ end
 
 local function OnEvent(_, event, arg1)
 	if event == "PLAYER_ENTERING_WORLD" then
+		-- A zone change can put an arbitrary gap between the last observed tick and the next,
+		-- so the cadence has to restart from scratch.
+		addon.PowerTick:Reset()
 		playerGroup:UpdateVisibility()
 		playerGroup:UpdateHealth()
 		playerGroup:UpdateAbsorb()

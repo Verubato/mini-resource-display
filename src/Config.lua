@@ -61,6 +61,17 @@ local dbDefaults = {
 
 	IncomingHealColor = { 0, 1, 0 },
 
+	-- Classic-only; ignored and never shown in the options on retail, where power regen
+	-- is continuous rather than ticked.
+	Ticker = {
+		Enabled = false,
+		Color = { 1, 1, 1 },
+		-- Fully opaque by default. Anything less blends with whatever the marker happens to be
+		-- crossing, so it looks like it changes colour partway along the bar.
+		Opacity = 1,
+		Thickness = 2,
+	},
+
 	Pet = {
 		Point = "CENTER",
 		RelativeTo = "UIParent",
@@ -515,6 +526,97 @@ function M:Init()
 		ihSwatch:MiniRefresh()
 	end)
 
+	-- Power Tick subcategory. Classic only - retail regen is continuous rather than ticked,
+	-- so there is nothing to point at and the panel isn't created there at all.
+	if addon.PowerTick:IsSupported() then
+		local tickerPanel = CreateFrame("Frame")
+		tickerPanel.name = "Power Tick"
+		mini:AddSubCategory(category, tickerPanel)
+
+		local tickerHeader = mini:PanelHeader({
+			Parent = tickerPanel,
+			Title = "Power Tick",
+			Description = "Shows when your next energy or mana regen tick will land.",
+			Gap = 6,
+		})
+
+		local tickerEnabledChk = mini:Checkbox({
+			Parent = tickerPanel,
+			LabelText = "Show power tick",
+			Tooltip = "Shows a marker sweeping across the power bar that restarts on every regen tick.",
+			GetValue = function()
+				return db.Ticker.Enabled
+			end,
+			SetValue = function(value)
+				db.Ticker.Enabled = value
+				addon:Reload()
+			end,
+		})
+
+		tickerEnabledChk:SetPoint("TOPLEFT", tickerHeader.Anchor, "BOTTOMLEFT", 0, -verticalSpacing)
+
+		local tickerDivider = mini:Divider({
+			Parent = tickerPanel,
+			Text = "Appearance",
+		})
+
+		tickerDivider:SetPoint("TOP", tickerEnabledChk, "BOTTOM", 0, -verticalSpacing)
+		tickerDivider:SetPoint("LEFT", tickerPanel, "LEFT")
+		tickerDivider:SetPoint("RIGHT", tickerPanel, "RIGHT", -horizontalSpacing, 0)
+
+		local tickerThicknessSlider = mini:Slider({
+			Parent = tickerPanel,
+			Min = 1,
+			Max = 10,
+			Step = 1,
+			Width = sliderWidth,
+			LabelText = "Thickness",
+			GetValue = function()
+				return db.Ticker.Thickness
+			end,
+			SetValue = function(value)
+				db.Ticker.Thickness = mini:ClampInt(value, 1, 10, dbDefaults.Ticker.Thickness)
+				addon:Reload()
+			end,
+		})
+
+		tickerThicknessSlider.Slider:SetPoint("TOPLEFT", tickerDivider, "BOTTOMLEFT", 0, -verticalSpacing * 3)
+
+		-- Same as the shield panel: the swatch anchors its own label to its right by default,
+		-- so drop that point before re-anchoring the label to the left.
+		local tickerSwatch = mini:ColorSwatch({
+			Parent = tickerPanel,
+			LabelText = "Colour",
+			Tooltip = "Click to change colour and opacity",
+			Size = 24,
+			GetValue = function()
+				local c = db.Ticker.Color
+				return c[1] or 1, c[2] or 1, c[3] or 1, db.Ticker.Opacity or 1
+			end,
+			SetValue = function(r, g, b, a)
+				db.Ticker.Color[1] = r
+				db.Ticker.Color[2] = g
+				db.Ticker.Color[3] = b
+				db.Ticker.Opacity = a
+			end,
+			OnChange = function()
+				addon:Reload()
+			end,
+		})
+
+		tickerSwatch.Label:ClearAllPoints()
+		tickerSwatch.Label:SetPoint("TOPLEFT", tickerThicknessSlider.Slider, "BOTTOMLEFT", 0, -verticalSpacing * 2)
+		tickerSwatch:SetPoint("LEFT", tickerSwatch.Label, "RIGHT", 8, 0)
+
+		local tickerSwatchHint = tickerPanel:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
+		tickerSwatchHint:SetPoint("LEFT", tickerSwatch, "RIGHT", 8, 0)
+		tickerSwatchHint:SetText("Click to change colour and opacity")
+
+		tickerPanel:HookScript("OnShow", function()
+			tickerSwatch:MiniRefresh()
+		end)
+	end
+
 	-- Misc subcategory
 	local miscPanel = CreateFrame("Frame")
 	miscPanel.name = "Misc"
@@ -583,9 +685,19 @@ function M:Init()
 			panel:MiniRefresh()
 			addon:Reload()
 			return
+		elseif msg == "tick" and addon.PowerTick:IsSupported() then
+			for _, line in ipairs(addon.PowerTick:Describe()) do
+				mini:Notify(line)
+			end
+			return
 		elseif msg and msg ~= "" then
 			mini:Notify("Commands:")
 			mini:Notify("/mrd reset")
+
+			if addon.PowerTick:IsSupported() then
+				mini:Notify("/mrd tick")
+			end
+
 			return
 		end
 

@@ -30,7 +30,9 @@ local dbDefaults = {
 	FontFlags = "OUTLINE",
 	FontShadow = true,
 
-	Texture = "Interface\\TARGETINGFRAME\\UI-StatusBar",
+	-- A LibSharedMedia name, not a texture path: the dropdown lists names, and anything else
+	-- has no entry to match so it shows the raw value instead.
+	Texture = "Blizzard",
 	Border = true,
 
 	HealthColor = { 0, 1, 0 },
@@ -104,6 +106,12 @@ function M:Init()
 	if db.Overshield then
 		db.Shield = db.Overshield
 		db.Overshield = nil
+	end
+
+	-- Migrate the old texture default, which stored a path where a LibSharedMedia name belongs.
+	-- Only ever reachable as the default, since the dropdown offers names alone.
+	if db.Texture == "Interface\\TARGETINGFRAME\\UI-StatusBar" then
+		db.Texture = "Blizzard"
 	end
 
 	local panel = CreateFrame("Frame")

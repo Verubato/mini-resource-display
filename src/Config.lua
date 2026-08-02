@@ -64,7 +64,9 @@ local dbDefaults = {
 	-- Classic-only; ignored and never shown in the options on retail, where power regen
 	-- is continuous rather than ticked.
 	Ticker = {
-		Enabled = false,
+		-- On by default. Harmless left true on retail, where IsSupported gates the whole
+		-- feature out before anything reads this.
+		Enabled = true,
 		Color = { 1, 1, 1 },
 		-- Fully opaque by default. Anything less blends with whatever the marker happens to be
 		-- crossing, so it looks like it changes colour partway along the bar.

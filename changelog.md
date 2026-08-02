@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.8.0
+
+Added new mana/energy ticker for classic.
+
 ## 2.7.0
 
 New MiniFramework added across all my mini addons.

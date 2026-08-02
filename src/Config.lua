@@ -458,11 +458,9 @@ function M:Init()
 	mini:AddSubCategory(category, overshieldPanel)
 	panels[#panels + 1] = overshieldPanel
 
-	-- Version belongs on the main panel only; repeating it on every subcategory is noise.
 	local osHeader = mini:PanelHeader({
 		Parent = overshieldPanel,
 		Title = "Shield",
-		ShowVersion = false,
 		Description = "Configure the colour and opacity of the shield bars.",
 		Gap = 6,
 	})
@@ -535,7 +533,6 @@ function M:Init()
 	local ihHeader = mini:PanelHeader({
 		Parent = ihPanel,
 		Title = "Incoming Heals",
-		ShowVersion = false,
 		Description = "Configure the colour of the incoming heal prediction bar.",
 		Gap = 6,
 	})
@@ -595,7 +592,6 @@ function M:Init()
 		local tickerHeader = mini:PanelHeader({
 			Parent = tickerPanel,
 			Title = "Power Tick",
-			ShowVersion = false,
 			Description = "Shows when your next energy or mana regen tick will land.",
 			Gap = 6,
 		})
@@ -686,7 +682,6 @@ function M:Init()
 	local miscHeader = mini:PanelHeader({
 		Parent = miscPanel,
 		Title = "Misc",
-		ShowVersion = false,
 		Description = "Miscellaneous settings.",
 		Gap = 6,
 	})

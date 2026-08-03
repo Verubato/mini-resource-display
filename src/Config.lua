@@ -85,6 +85,7 @@ local dbDefaults = {
 		Locked = false,
 	},
 }
+---@class Config
 local M = {}
 
 addon.Config = M

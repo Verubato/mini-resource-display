@@ -232,6 +232,36 @@ fw.describe("MiniResourceDisplay - cadence and progress", function()
 		fw.is_nil(env.Tick:GetProgress(), "at the cap")
 	end)
 
+	fw.it("does not free-run the phase forward a frame at a time", function()
+		-- A capped bar rolls over with no real tick to correct it, so rollover error accumulates
+		-- for as long as the player stands there. Polling just past each boundary is the worst
+		-- case, and the one a real client hits.
+		env.PollAt(20)
+		env.PollAt(100)
+
+		local anchor = env.Tick.tickAt
+
+		for _ = 1, 20 do
+			env.Advance(TICK_PERIOD + 0.05)
+			env.Poll()
+		end
+
+		local drift = (env.Tick.tickAt - anchor) % TICK_PERIOD
+
+		fw.truthy(drift < 1e-9, "phase still aligned after 20 rollovers, drift " .. tostring(drift))
+	end)
+
+	fw.it("catches the cadence up in one step after a long gap", function()
+		-- A loading screen stops the polling, and rolling over one period per frame would take
+		-- as many frames to catch up as periods were missed.
+		env.PollAt(20)
+
+		env.Advance(TICK_PERIOD * 10 + 0.5)
+		env.Poll()
+
+		fw.eq(env.Tick:GetProgress(), 0.25, "back in phase immediately")
+	end)
+
 	fw.it("points nowhere for a resource that does not regenerate", function()
 		-- Rage and runic power do not tick, so the whole feature has nothing to say.
 		env.UsePowerType(_G.Enum.PowerType.Rage, 100)

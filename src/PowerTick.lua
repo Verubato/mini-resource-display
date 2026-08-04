@@ -162,15 +162,22 @@ function M:Poll()
 		self.awaitingTick = true
 	end
 
+	if isTick then
+		self.tickAt = now
+
+		return
+	end
+
 	-- The cadence free-runs. When a whole period passes with nothing detected - resource
 	-- capped, a tick filtered out, mana held down by the five second rule - roll over anyway
 	-- so the marker keeps moving, and let the next real tick pull it back into phase.
-	if now >= self.tickAt + TICK_PERIOD then
-		isTick = true
-	end
+	--
+	-- Advanced by whole periods from the anchor rather than snapped to now, which would drift
+	-- the phase a frame per rollover, and a capped bar rolls over with no tick to correct it.
+	local elapsed = now - self.tickAt
 
-	if isTick then
-		self.tickAt = now
+	if elapsed >= TICK_PERIOD then
+		self.tickAt = self.tickAt + TICK_PERIOD * math.floor(elapsed / TICK_PERIOD)
 	end
 end
 

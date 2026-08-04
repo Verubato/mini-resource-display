@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.8.1
+
+Updated interface versions for the latest client builds.
+
 ## 2.8.0
 
 Added new mana/energy ticker for classic.

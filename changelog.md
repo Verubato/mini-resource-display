@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.8.2
+
+Fixed the classic tick marker drifting out of time when no regen tick was detected for a while, such as after a loading screen.
+
 ## 2.8.1
 
 Updated interface versions for the latest client builds.

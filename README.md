@@ -17,9 +17,9 @@ Feedback and feature requests are more than welcome!
 
 ## Screenshots
 
-![MiniResourceDisplay screenshot](https://media.forgecdn.net/attachments/1492/302/screenshot-settings-png.png)
+![MiniResourceDisplay screenshot](https://raw.githubusercontent.com/Verubato/mini-resource-display/main/assets/ScreenshotSettings.png)
 
-![MiniResourceDisplay screenshot](https://media.forgecdn.net/attachments/1451/53/screenshot-png.png)
+![MiniResourceDisplay screenshot](https://raw.githubusercontent.com/Verubato/mini-resource-display/main/assets/Screenshot.png)
 
 ## Download
 

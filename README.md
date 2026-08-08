@@ -17,9 +17,9 @@ Feedback and feature requests are more than welcome!
 
 ## Screenshots
 
-![MiniResourceDisplay screenshot](https://raw.githubusercontent.com/Verubato/mini-resource-display/main/assets/ScreenshotSettings.png)
+![MiniResourceDisplay screenshot](https://raw.githubusercontent.com/Verubato/mini-resource-display/main/assets/Screenshots/Settings.png)
 
-![MiniResourceDisplay screenshot](https://raw.githubusercontent.com/Verubato/mini-resource-display/main/assets/Screenshot.png)
+![MiniResourceDisplay screenshot](https://raw.githubusercontent.com/Verubato/mini-resource-display/main/assets/Screenshots/Bars.png)
 
 ## Download
 

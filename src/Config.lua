@@ -743,15 +743,15 @@ function M:Init()
 			return
 		elseif msg == "tick" and addon.PowerTick:IsSupported() then
 			for _, line in ipairs(addon.PowerTick:Describe()) do
-				mini:Notify(line)
+				mini:NotifyWithPrefix(line)
 			end
 			return
 		elseif msg and msg ~= "" then
-			mini:Notify("Commands:")
-			mini:Notify("/mrd reset")
+			mini:NotifyWithPrefix("Commands:")
+			mini:NotifyWithPrefix("/mrd reset")
 
 			if addon.PowerTick:IsSupported() then
-				mini:Notify("/mrd tick")
+				mini:NotifyWithPrefix("/mrd tick")
 			end
 
 			return

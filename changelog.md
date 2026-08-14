@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.8.4
+
+Dropped old retail clients support.
+
 ## 2.8.3
 
 Updated the addon icon to the new shared Mini style.

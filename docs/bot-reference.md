@@ -1,7 +1,7 @@
 # MiniResourceDisplay bot reference
 
-Addon: MiniResourceDisplay, version 2.8.3, by Verz.
-Supported interface versions (from the .toc): 120100, 120007, 50504, 40402, 38002, 38000, 30405, 30300, 20506, 11509. This covers retail (12.1.0 / 12.0.7) and the Classic clients (Mists Classic, Cataclysm Classic, Wrath Classic, TBC Classic, Classic Era).
+Addon: MiniResourceDisplay, version 2.8.4, by Verz.
+Supported interface versions (from the .toc): 120100, 50504, 40402, 38002, 38000, 30405, 30300, 20506, 11509. This covers retail (12.1.0) and the Classic clients (Mists Classic, Cataclysm Classic, Wrath Classic, TBC Classic, Classic Era).
 Saved variables: MiniResourceDisplayDB (account wide). Bundled libraries: LibStub, CallbackHandler-1.0, LibSharedMedia-3.0, LibUIDropDownMenu, MiniFramework.
 
 ## What it does

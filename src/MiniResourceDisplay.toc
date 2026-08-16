@@ -1,6 +1,7 @@
 ## Interface: 120100, 50504, 40402, 38002, 38000, 30405, 30300, 20506, 11509
 ## Title: MiniResourceDisplay
 ## Notes: Simple personal resource-style health + power bar you can tweak.
+## Category: Mini
 ## Author: Verz
 ## Version: 2.8.4
 ## SavedVariables: MiniResourceDisplayDB

@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.8.6
+
+Reduced CPU use while the power tick marker is on screen.
+
 ## 2.8.5
 
 Added a Mini category so the addon groups with the other Mini addons in the addon list.

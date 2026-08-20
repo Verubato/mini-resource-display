@@ -422,7 +422,17 @@ local function CreateBarGroup(unit, containerName, hasPower, getPositionDb)
 		local b = (color and color[3]) or 1
 		local alpha = ticker.Opacity or 1
 
-		self.tickSpark:SetColorTexture(r, g, b, alpha)
+		-- This runs every frame the marker is visible, and SetColorTexture rebuilds the
+		-- texture, so only write it when the configured colour has actually moved.
+		if
+			self.tickSparkR ~= r
+			or self.tickSparkG ~= g
+			or self.tickSparkB ~= b
+			or self.tickSparkA ~= alpha
+		then
+			self.tickSparkR, self.tickSparkG, self.tickSparkB, self.tickSparkA = r, g, b, alpha
+			self.tickSpark:SetColorTexture(r, g, b, alpha)
+		end
 
 		local width = self.tickFrame:GetWidth() or 0
 		local thickness = ticker.Thickness or 2

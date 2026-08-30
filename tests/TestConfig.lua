@@ -86,85 +86,25 @@ local function FindTextureDropdown()
 	end
 end
 
----The shared mock's own menu description has no AddInitializer, so calling a decorator
----directly would stay green even if it were never wired to the dropdown.
+---Every row's label, keyed by the value it sets. A label carries its own texture escape, so
+---this is where the swatch shows up rather than on any region.
 ---@param dd table
----@return table<any, fun(button: table)>
-local function MenuInitializers(dd)
-	local initializers = {}
-	local description = {}
-
-	setmetatable(description, {
+---@return table<any, string>
+local function MenuLabels(dd)
+	local labels = {}
+	local description = setmetatable({}, {
 		__index = function()
 			return function() end
 		end,
 	})
 
-	description.CreateRadio = function(_, _, _, _, value)
-		local node = {}
-
-		node.AddInitializer = function(_, initializer)
-			initializers[value] = initializer
-		end
-
-		return node
+	description.CreateRadio = function(_, label, _, _, value)
+		labels[value] = label
 	end
 
 	dd.__menuGenerator(dd, description)
 
-	return initializers
-end
-
----A stand-in for the texture region a real preview would create on a menu row.
----@return table
-local function NewPreviewTexture()
-	local texture = {}
-
-	function texture:ClearAllPoints()
-		texture.points = {}
-	end
-
-	function texture:SetPoint(point, _, relativePoint, x, y)
-		texture.points = texture.points or {}
-		texture.points[#texture.points + 1] = { Point = point, RelativePoint = relativePoint, X = x, Y = y }
-	end
-
-	function texture:SetSize(width, height)
-		texture.width = width
-		texture.height = height
-	end
-
-	function texture:SetTexture(file)
-		texture.file = file
-	end
-
-	function texture:Show()
-		texture.shown = true
-	end
-
-	function texture:Hide()
-		texture.shown = false
-	end
-
-	return texture
-end
-
----A stand-in for a pooled menu row, which a real menu creates once and reuses after that.
----@param height number
----@return table
-local function StubPreviewButton(height)
-	local button = { CreateTextureCalls = 0 }
-
-	function button:CreateTexture()
-		button.CreateTextureCalls = button.CreateTextureCalls + 1
-		return NewPreviewTexture()
-	end
-
-	function button:GetHeight()
-		return height
-	end
-
-	return button
+	return labels
 end
 
 fw.describe("Config panel: Shield tab", function()
@@ -293,7 +233,7 @@ fw.describe("Texture media subscription", function()
 end)
 
 fw.describe("Texture dropdown preview", function()
-	fw.it("previews the file a row names rather than the live global override", function()
+	fw.it("draws the file a row names rather than the live global override", function()
 		local context = harness.Load("MiniResourceDisplay")
 		harness.Login(context)
 
@@ -311,78 +251,34 @@ fw.describe("Texture dropdown preview", function()
 		local textureDdl = FindTextureDropdown()
 		fw.not_nil(textureDdl, "the texture dropdown wires a menu generator")
 
-		local rowInitializer = MenuInitializers(textureDdl)[rowName]
-		fw.not_nil(rowInitializer, "the texture dropdown wires a row initializer for the registered name")
+		local label = MenuLabels(textureDdl)[rowName]
 
-		local button = StubPreviewButton(20)
-		rowInitializer(button)
-
-		local preview = button.MiniResourceDisplayPreview
-		fw.not_nil(preview, "the row creates a preview texture")
-		fw.eq(preview.file, rowPath, "the row previews the file it names rather than the global override")
-		fw.truthy(preview.shown, "the preview is shown")
+		fw.not_nil(label, "the registered face has a row")
+		fw.truthy(label:find(rowPath, 1, true), "the row draws the file it names rather than the global override")
+		fw.truthy(label:find(rowName, 1, true), "the row still reads as its own name")
 	end)
 
-	fw.it("reuses one texture across rows instead of creating a new one per open", function()
+	fw.it("carries a texture escape sized to draw something", function()
 		local context = harness.Load("MiniResourceDisplay")
 		harness.Login(context)
 
-		local lsm = LibStub and LibStub("LibSharedMedia-3.0", true)
-		local firstName = "MiniResourceDisplay Preview First"
-		local secondName = "MiniResourceDisplay Preview Second"
-		local firstPath = "Interface\\AddOns\\Test\\PreviewFirst.tga"
-		local secondPath = "Interface\\AddOns\\Test\\PreviewSecond.tga"
+		local label = MenuLabels(FindTextureDropdown())["Blizzard"]
+		local height, width = label:match("|T.-:(%d+):(%d+)|t")
 
-		lsm:Register("statusbar", firstName, firstPath)
-		lsm:Register("statusbar", secondName, secondPath)
-
-		local initializers = MenuInitializers(FindTextureDropdown())
-		local button = StubPreviewButton(20)
-
-		initializers[firstName](button)
-		local preview = button.MiniResourceDisplayPreview
-		fw.eq(preview.file, firstPath, "the first row previews its own file")
-		fw.eq(button.CreateTextureCalls, 1, "the row creates its preview texture once")
-
-		initializers[secondName](button)
-		fw.eq(button.MiniResourceDisplayPreview, preview, "a reopened row keeps the texture it first created")
-		fw.eq(button.CreateTextureCalls, 1, "a reopened row doesn't create a second texture")
-		fw.eq(preview.file, secondPath, "the reused texture is repointed at the reopened row's own file")
-
-		fw.eq(#preview.points, 1, "the reused texture drops the anchor the earlier row gave it")
-		fw.eq(preview.points[1].Point, "RIGHT", "the preview hangs off the row's right edge")
-		fw.eq(preview.points[1].RelativePoint, "RIGHT", "anchored to that same edge of the row")
+		fw.not_nil(height, "the row opens with a texture escape")
+		fw.truthy(tonumber(width) > 0, "the swatch has a visible width")
+		fw.truthy(tonumber(height) > 0, "the swatch has a visible height")
 	end)
 
-	fw.it("previews the built-in bar for the Blizzard row", function()
+	fw.it("draws the built-in bar for the Blizzard row", function()
 		local context = harness.Load("MiniResourceDisplay")
 		harness.Login(context)
 
-		local initializers = MenuInitializers(FindTextureDropdown())
-		local blizzardInitializer = initializers["Blizzard"]
-		fw.not_nil(blizzardInitializer, "the Blizzard row wires an initializer")
+		local label = MenuLabels(FindTextureDropdown())["Blizzard"]
 
-		local button = StubPreviewButton(20)
-		blizzardInitializer(button)
-
-		fw.eq(
-			button.MiniResourceDisplayPreview.file,
-			"Interface\\TARGETINGFRAME\\UI-StatusBar",
-			"the Blizzard row previews the built-in statusbar texture"
+		fw.truthy(
+			label:find(context.Addon.BlizzardStatusBarTexture, 1, true),
+			"the Blizzard row draws the built-in statusbar texture"
 		)
-	end)
-
-	fw.it("sizes the preview inside the row's own height, not flush with its edges", function()
-		local context = harness.Load("MiniResourceDisplay")
-		harness.Login(context)
-
-		local initializers = MenuInitializers(FindTextureDropdown())
-		local button = StubPreviewButton(20)
-
-		initializers["Blizzard"](button)
-
-		local preview = button.MiniResourceDisplayPreview
-		fw.truthy(preview.height > 0 and preview.height < 20, "the preview height is inset from the row's own height")
-		fw.truthy(preview.width > 0, "the preview has a visible width")
 	end)
 end)

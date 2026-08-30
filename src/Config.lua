@@ -3,8 +3,8 @@ local LSM = LibStub and LibStub("LibSharedMedia-3.0", true)
 ---@type MiniFramework
 local mini = addon.Framework
 
-local TEXTURE_PREVIEW_WIDTH = 70
-local TEXTURE_PREVIEW_INSET = 3
+local SWATCH_HEIGHT = 10
+local SWATCH_WIDTH = 72
 
 ---@type Db
 local db
@@ -117,22 +117,14 @@ local function GetPreviewStatusBarTexture(value)
 	return (files and files[value]) or addon.BlizzardStatusBarTexture
 end
 
----@param button table
+---A menu row refuses a texture created on it, so the swatch is drawn inside the row's own
+---text instead.
 ---@param value string
-local function DecorateTextureRow(button, value)
-	local preview = button.MiniResourceDisplayPreview
+---@return string
+local function TextureLabel(value)
+	local file = GetPreviewStatusBarTexture(value)
 
-	-- Menu rows are pooled, so the texture is made once and repointed on every open.
-	if not preview then
-		preview = button:CreateTexture(nil, "ARTWORK")
-		button.MiniResourceDisplayPreview = preview
-	end
-
-	preview:ClearAllPoints()
-	preview:SetPoint("RIGHT", button, "RIGHT", -TEXTURE_PREVIEW_INSET, 0)
-	preview:SetSize(TEXTURE_PREVIEW_WIDTH, button:GetHeight() - TEXTURE_PREVIEW_INSET * 2)
-	preview:SetTexture(GetPreviewStatusBarTexture(value))
-	preview:Show()
+	return "|T" .. file .. ":" .. SWATCH_HEIGHT .. ":" .. SWATCH_WIDTH .. "|t " .. value
 end
 
 function M:Init()
@@ -449,7 +441,7 @@ function M:Init()
 			db.Texture = value
 			addon:Reload()
 		end,
-		DecorateItem = DecorateTextureRow,
+		GetText = TextureLabel,
 	})
 
 	local textureDivider = mini:Divider({

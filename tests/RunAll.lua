@@ -12,6 +12,7 @@ io.write("======================================\n")
 
 local testFiles = {
 	"tests/TestPowerTick.lua",
+	"tests/TestConfig.lua",
 	-- Last: the smoke test installs a clean client over whatever the suites above left.
 	"tests/TestSmoke.lua",
 }

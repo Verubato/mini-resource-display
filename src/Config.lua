@@ -467,6 +467,7 @@ function M:Init()
 		Title = "Shield",
 		Description = "Configure the colour and opacity of the shield bars.",
 		Gap = 6,
+		Divider = "Settings",
 	})
 
 	local osEnabledChk = mini:Checkbox({
@@ -483,15 +484,6 @@ function M:Init()
 	})
 
 	osEnabledChk:SetPoint("TOPLEFT", osHeader.Anchor, "BOTTOMLEFT", 0, -verticalSpacing)
-
-	local osDivider = mini:Divider({
-		Parent = overshieldPanel,
-		Text = "Colour & Opacity",
-	})
-
-	osDivider:SetPoint("TOP", osEnabledChk, "BOTTOM", 0, -verticalSpacing)
-	osDivider:SetPoint("LEFT", overshieldPanel, "LEFT")
-	osDivider:SetPoint("RIGHT", overshieldPanel, "RIGHT", -horizontalSpacing, 0)
 
 	local osSwatch = mini:ColorSwatch({
 		Parent = overshieldPanel,
@@ -517,7 +509,7 @@ function M:Init()
 	-- the left, so drop that point before re-anchoring - leaving it would make the
 	-- label and the swatch depend on each other.
 	osSwatch.Label:ClearAllPoints()
-	osSwatch.Label:SetPoint("TOPLEFT", osDivider, "BOTTOMLEFT", 0, -verticalSpacing)
+	osSwatch.Label:SetPoint("TOPLEFT", osEnabledChk, "BOTTOMLEFT", 0, -verticalSpacing)
 	osSwatch:SetPoint("LEFT", osSwatch.Label, "RIGHT", 8, 0)
 
 	local osSwatchHint = overshieldPanel:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")

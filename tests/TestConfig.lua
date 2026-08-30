@@ -5,6 +5,7 @@
 
 local fw = require("TestFramework")
 local harness = require("AddonHarness")
+local WowMock = require("WowMock")
 
 ---Wraps a framework function so every call is recorded, in the single shared order list,
 ---before running the real one. A per-kind list alone can't prove one call came before
@@ -45,6 +46,22 @@ local function BuildContext()
 	harness.Login(context)
 
 	return context, spies
+end
+
+---The player's health bar is the first StatusBar this display parents to its container.
+---@return table?
+local function FindHealthBar()
+	local container = _G["MiniResourceDisplayFrame"]
+
+	if not container then
+		return nil
+	end
+
+	for _, frame in ipairs(WowMock.Frames) do
+		if frame:GetObjectType() == "StatusBar" and frame:GetParent() == container then
+			return frame
+		end
+	end
 end
 
 ---Finds the single PanelHeader call for the given title, nil for the main panel's own header.
@@ -123,5 +140,62 @@ fw.describe("Config panel: reset to defaults", function()
 		mainHeader.Reset.OnAccept()
 
 		fw.eq(_G.MiniResourceDisplayDB.HideTextSuffix, false, "HideTextSuffix back to default")
+	end)
+end)
+
+fw.describe("Texture media subscription", function()
+	fw.it("coalesces registrations and reaches the live health bar once a texture arrives late", function()
+		local context = harness.Load("MiniResourceDisplay")
+		harness.Login(context)
+
+		local healthBar = FindHealthBar()
+
+		fw.not_nil(healthBar, "the player's health bar exists")
+
+		local lsm = LibStub and LibStub("LibSharedMedia-3.0", true)
+		fw.not_nil(lsm, "LibSharedMedia resolves under the mock")
+
+		lsm:Register("statusbar", "MiniResourceDisplay Coalesce One", "Interface\\AddOns\\Test\\CoalesceOne.tga")
+		lsm:Register("statusbar", "MiniResourceDisplay Coalesce Two", "Interface\\AddOns\\Test\\CoalesceTwo.tga")
+
+		fw.eq(WowMock.RunTimers(), 1, "two registrations in one frame coalesce into a single refresh")
+
+		local textureName = "MiniResourceDisplay Late Texture"
+		local texturePath = "Interface\\AddOns\\MiniResourceDisplay\\LateTexture.tga"
+
+		-- Before the name is registered, Fetch answers LibSharedMedia's own default statusbar
+		-- rather than nil, which is what the bar draws until the name resolves to something else.
+		local fallbackTexture = lsm:Fetch("statusbar", textureName)
+		fw.not_nil(fallbackTexture, "LibSharedMedia has a default statusbar to fall back on")
+
+		local previousTexture = _G.MiniResourceDisplayDB.Texture
+
+		-- Mirrors a name saved from a previous session, before this session's texture pack
+		-- has registered it.
+		_G.MiniResourceDisplayDB.Texture = textureName
+		context.Addon:Reload()
+
+		local beforeRegister = healthBar:GetStatusBarTexture()
+		fw.eq(beforeRegister and beforeRegister:GetTexture(), fallbackTexture, "the bar starts on the default texture")
+
+		lsm:Register("statusbar", textureName, texturePath)
+
+		local afterRegister = healthBar:GetStatusBarTexture()
+		fw.eq(
+			afterRegister and afterRegister:GetTexture(),
+			fallbackTexture,
+			"the registration alone doesn't reach the live bar yet"
+		)
+
+		WowMock.RunTimers()
+
+		local afterRefresh = healthBar:GetStatusBarTexture()
+		fw.eq(
+			afterRefresh and afterRefresh:GetTexture(),
+			texturePath,
+			"the live bar picks up the texture once the coalesced refresh runs"
+		)
+
+		_G.MiniResourceDisplayDB.Texture = previousTexture
 	end)
 end)

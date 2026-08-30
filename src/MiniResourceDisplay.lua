@@ -10,6 +10,8 @@ local db
 
 local playerGroup
 local petGroup
+local mediaSubscribed = false
+local textureRefreshQueued = false
 
 local function GetConfiguredTexture()
 	if db.Texture == "Blizzard" then
@@ -23,6 +25,51 @@ local function GetConfiguredTexture()
 	end
 
 	return texture or fallbackTexture
+end
+
+---Re-applies the configured texture to whichever bar groups have loaded, so a texture pack
+---that registers after login corrects the bars.
+local function RefreshTextures()
+	if playerGroup then
+		playerGroup:UpdateTextures()
+	end
+
+	if petGroup then
+		petGroup:UpdateTextures()
+	end
+end
+
+---Runs the texture refresh once at the end of the frame however many times it is asked for in
+---one, since LibSharedMedia fires once per registered entry and a media pack registers its
+---whole set inside a single frame.
+local function QueueTextureRefresh()
+	if textureRefreshQueued then
+		return
+	end
+
+	textureRefreshQueued = true
+
+	C_Timer.After(0, function()
+		textureRefreshQueued = false
+		RefreshTextures()
+	end)
+end
+
+---db.Texture holds a LibSharedMedia name, resolved live through Fetch, so both a texture pack
+---registering late and a global statusbar override change what the bars should draw.
+local function EnsureMediaSubscription()
+	if mediaSubscribed then
+		return
+	end
+
+	if not LSM or not LSM.RegisterCallback then
+		return
+	end
+
+	mediaSubscribed = true
+
+	LSM.RegisterCallback(addon, "LibSharedMedia_Registered", QueueTextureRefresh)
+	LSM.RegisterCallback(addon, "LibSharedMedia_SetGlobal", QueueTextureRefresh)
 end
 
 local function AddBlackOutline(frame)
@@ -823,6 +870,8 @@ local function OnAddonLoaded()
 	addon.Config:Init()
 
 	db = mini:GetSavedVars()
+
+	EnsureMediaSubscription()
 
 	-- Wait for PLAYER_ENTERING_WORLD so other addons have had time to register
 	-- their textures with LSM, then defer one frame tick to catch any that

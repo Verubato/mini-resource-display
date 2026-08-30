@@ -75,3 +75,25 @@ fw.describe("Config panel: Shield tab", function()
 		end
 	end)
 end)
+
+fw.describe("Config panel: Misc tab", function()
+	fw.it("creates the hide text suffix checkbox before the opacity slider", function()
+		local _, spies = BuildContext()
+		local miscHeader = FindHeader(spies.PanelHeader, "Misc")
+		local checkboxIndex, sliderIndex
+
+		for i, entry in ipairs(spies.Order) do
+			if entry.Options.Parent == miscHeader.Parent then
+				if entry.Kind == "Checkbox" and entry.Options.LabelText == "Hide text suffix" then
+					checkboxIndex = i
+				elseif entry.Kind == "Slider" then
+					sliderIndex = i
+				end
+			end
+		end
+
+		fw.not_nil(checkboxIndex, "hide text suffix checkbox")
+		fw.not_nil(sliderIndex, "out of combat opacity slider")
+		fw.truthy(checkboxIndex < sliderIndex, "checkbox created before the slider")
+	end)
+end)

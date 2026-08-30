@@ -1,7 +1,7 @@
 local addonName, addon = ...
 ---@type MiniFramework
 local mini = addon.Framework
-local LSM = LibStub and LibStub("LibSharedMedia-3.0", false)
+local LSM = LibStub and LibStub("LibSharedMedia-3.0", true)
 local eventsFrame
 local fallbackTexture = "Interface\\TARGETINGFRAME\\UI-StatusBar"
 local smoothing = Enum and Enum.StatusBarInterpolation and Enum.StatusBarInterpolation.ExponentialEaseOut

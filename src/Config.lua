@@ -101,6 +101,9 @@ local function GetTexturesList()
 end
 
 function M:Init()
+	-- A styled button clashes with the stock Blizzard art around it in the settings screen.
+	mini:SetCustomStyling(true, { Button = false })
+
 	db = mini:GetSavedVars(dbDefaults)
 
 	-- Migrate renamed db key: Overshield -> Shield

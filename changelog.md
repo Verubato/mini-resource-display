@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.8.7
+
+- UI improvements.
+- Fixed bar textures not updating when a new texture pack loads.
+- Added texture previews to the texture dropdown.
+
 ## 2.8.6
 
 Reduced CPU use while the power tick marker is on screen.

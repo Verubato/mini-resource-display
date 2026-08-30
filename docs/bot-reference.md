@@ -1,6 +1,6 @@
 # MiniResourceDisplay bot reference
 
-Addon: MiniResourceDisplay, version 2.8.6, by Verz.
+Addon: MiniResourceDisplay, version 2.8.7, by Verz.
 Supported interface versions (from the .toc): 120100, 50504, 40402, 38002, 38000, 30405, 30300, 20506, 11509. This covers retail (12.1.0) and the Classic clients (Mists Classic, Cataclysm Classic, Wrath Classic, TBC Classic, Classic Era).
 Saved variables: MiniResourceDisplayDB (account wide). Bundled libraries: LibStub, CallbackHandler-1.0, LibSharedMedia-3.0, LibUIDropDownMenu, MiniFramework.
 
@@ -26,7 +26,7 @@ A simple personal-resource-style display: a movable health bar and power (mana/e
 - Shields (absorbs): a shield overlay fills the empty part of the health bar for absorbs; when absorbs exceed missing health, an overshield overlay fills backwards from the right edge of the bar. Colour and opacity are configurable; the whole indicator can be turned off.
 - Incoming heals: a prediction bar in the empty part of the health bar for heals in flight, colour configurable (green by default).
 - Pet bar: a separate health-only bar for your pet (no pet power bar). Off by default; only shows while a pet exists, and follows the same combat show/hide rules as the player bars. It has its own size and position but shares texture, text, colour and other appearance settings.
-- Bar texture: chosen from LibSharedMedia "statusbar" textures. The default "Blizzard" is the stock UI status bar texture. Textures registered by other addons (e.g. SharedMedia) appear in the dropdown automatically; the list refreshes when the panel is opened.
+- Bar texture: chosen from LibSharedMedia "statusbar" textures. The default "Blizzard" is the stock UI status bar texture. Textures registered by other addons (e.g. SharedMedia) appear in the dropdown automatically, each row previewing its own texture next to the name; the list refreshes when the panel is opened. If a texture pack registers after login, the bars pick up the change automatically without a reload.
 - Power tick (Classic clients only): a vertical marker sweeps across the power bar and restarts on every server regen tick (2 second cadence). Mana and energy only. The marker hides at full power, and for mana it hides while the five second rule is active and until the next real tick reveals the cadence. Energy ticks are recognised by the 20-energy tick amount (40 with Adrenaline Rush), so procs and refunds are ignored.
 
 The display loads after you first enter the world, so it appears shortly after the loading screen, not at the login screen.
@@ -96,8 +96,8 @@ Look & Feel section:
 
 | Option | Default | Range / notes |
 |---|---|---|
-| Out of combat opacity | 1 | 0-1, step 0.05; only applies while "Always show" is on |
 | Hide text suffix | Off | Hides "%" and abbreviation suffixes such as "K" |
+| Out of combat opacity | 1 | 0-1, step 0.05; only applies while "Always show" is on |
 
 ## Hidden settings (saved variables only, no UI)
 

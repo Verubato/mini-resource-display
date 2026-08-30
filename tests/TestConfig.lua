@@ -97,3 +97,31 @@ fw.describe("Config panel: Misc tab", function()
 		fw.truthy(checkboxIndex < sliderIndex, "checkbox created before the slider")
 	end)
 end)
+
+fw.describe("Config panel: reset to defaults", function()
+	fw.it("puts the reset button on the main header instead of a hand-rolled one", function()
+		local context, spies = BuildContext()
+		local mainHeader = FindHeader(spies.PanelHeader, nil)
+
+		fw.not_nil(mainHeader, "main PanelHeader call")
+		fw.not_nil(mainHeader.Reset, "Reset option")
+		fw.eq(type(mainHeader.Reset.OnAccept), "function", "Reset.OnAccept")
+
+		for _, options in ipairs(spies.Button) do
+			fw.neq(options.Text, "Reset to defaults", "hand-rolled reset button")
+		end
+
+		fw.is_nil(_G.StaticPopupDialogs[context.Name:upper() .. "_RESET_DEFAULTS"], "hand-rolled confirm popup")
+	end)
+
+	fw.it("resets saved settings back to their defaults when accepted", function()
+		local _, spies = BuildContext()
+		local mainHeader = FindHeader(spies.PanelHeader, nil)
+
+		_G.MiniResourceDisplayDB.HideTextSuffix = true
+
+		mainHeader.Reset.OnAccept()
+
+		fw.eq(_G.MiniResourceDisplayDB.HideTextSuffix, false, "HideTextSuffix back to default")
+	end)
+end)

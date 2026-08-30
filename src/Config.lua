@@ -143,21 +143,6 @@ function M:Init()
 		addon:Reload()
 	end
 
-	-- Addon scoped so sibling Mini addons can't collide on the key.
-	local resetPopup = addonName:upper() .. "_RESET_DEFAULTS"
-
-	StaticPopupDialogs[resetPopup] = {
-		text = "Reset all " .. addonName .. " settings back to their defaults?",
-		button1 = YES,
-		button2 = NO,
-		OnAccept = ResetToDefaults,
-		timeout = 0,
-		whileDead = true,
-		hideOnEscape = true,
-		-- Keeps the popup off the stock frames Blizzard reuses, which can arrive tainted.
-		preferredIndex = 3,
-	}
-
 	local verticalSpacing = mini.VerticalSpacing
 	local horizontalSpacing = mini.HorizontalSpacing
 	local columns = 4
@@ -166,19 +151,10 @@ function M:Init()
 		Parent = panel,
 		Description = "Shows simple personal resource style health and power bars.",
 		Gap = 6,
+		Reset = {
+			OnAccept = ResetToDefaults,
+		},
 	})
-
-	local resetButton = mini:Button({
-		Parent = panel,
-		Text = "Reset to defaults",
-		Width = 140,
-		OnClick = function()
-			StaticPopup_Show(resetPopup)
-		end,
-	})
-
-	-- Level with the header title, inset to the same right edge the dividers use.
-	resetButton:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -horizontalSpacing, -verticalSpacing)
 
 	local mainDivider = mini:Divider({
 		Parent = panel,

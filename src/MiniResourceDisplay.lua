@@ -3,7 +3,9 @@ local addonName, addon = ...
 local mini = addon.Framework
 local LSM = LibStub and LibStub("LibSharedMedia-3.0", true)
 local eventsFrame
+-- The "Blizzard" entry is a sentinel name rather than a file LSM can resolve.
 local fallbackTexture = "Interface\\TARGETINGFRAME\\UI-StatusBar"
+addon.BlizzardStatusBarTexture = fallbackTexture
 local smoothing = Enum and Enum.StatusBarInterpolation and Enum.StatusBarInterpolation.ExponentialEaseOut
 ---@type Db
 local db

@@ -2,6 +2,10 @@ local addonName, addon = ...
 local LSM = LibStub and LibStub("LibSharedMedia-3.0", true)
 ---@type MiniFramework
 local mini = addon.Framework
+
+local TEXTURE_PREVIEW_WIDTH = 70
+local TEXTURE_PREVIEW_INSET = 3
+
 ---@type Db
 local db
 ---@class Db
@@ -100,6 +104,37 @@ local function GetTexturesList()
 	return list
 end
 
+---A global statusbar override would make every row draw the same file, so this reads the
+---media table straight.
+---@param value string
+---@return string
+local function GetPreviewStatusBarTexture(value)
+	if value == "Blizzard" then
+		return addon.BlizzardStatusBarTexture
+	end
+
+	local files = LSM and LSM:HashTable("statusbar")
+	return (files and files[value]) or addon.BlizzardStatusBarTexture
+end
+
+---@param button table
+---@param value string
+local function DecorateTextureRow(button, value)
+	local preview = button.MiniResourceDisplayPreview
+
+	-- Menu rows are pooled, so the texture is made once and repointed on every open.
+	if not preview then
+		preview = button:CreateTexture(nil, "ARTWORK")
+		button.MiniResourceDisplayPreview = preview
+	end
+
+	preview:ClearAllPoints()
+	preview:SetPoint("RIGHT", button, "RIGHT", -TEXTURE_PREVIEW_INSET, 0)
+	preview:SetSize(TEXTURE_PREVIEW_WIDTH, button:GetHeight() - TEXTURE_PREVIEW_INSET * 2)
+	preview:SetTexture(GetPreviewStatusBarTexture(value))
+	preview:Show()
+end
+
 function M:Init()
 	-- A styled button clashes with the stock Blizzard art around it in the settings screen.
 	mini:SetCustomStyling(true, { Button = false })
@@ -114,7 +149,7 @@ function M:Init()
 
 	-- Migrate the old texture default, which stored a path where a LibSharedMedia name belongs.
 	-- Only ever reachable as the default, since the dropdown offers names alone.
-	if db.Texture == "Interface\\TARGETINGFRAME\\UI-StatusBar" then
+	if db.Texture == addon.BlizzardStatusBarTexture then
 		db.Texture = "Blizzard"
 	end
 
@@ -414,6 +449,7 @@ function M:Init()
 			db.Texture = value
 			addon:Reload()
 		end,
+		DecorateItem = DecorateTextureRow,
 	})
 
 	local textureDivider = mini:Divider({

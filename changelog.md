@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.8.8
+
+Added WoW Forever support.
+
 ## 2.8.7
 
 - UI improvements.

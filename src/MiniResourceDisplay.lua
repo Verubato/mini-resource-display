@@ -15,6 +15,45 @@ local petGroup
 local mediaSubscribed = false
 local textureRefreshQueued = false
 
+-- Blood, unholy, frost, death, in GetRuneType's own order.
+local RUNE_TYPE_COLORS = {
+	{ 0.77, 0.12, 0.23 },
+	{ 0.20, 0.80, 0.20 },
+	{ 0.10, 0.70, 0.90 },
+	{ 0.55, 0.55, 0.55 },
+}
+
+-- Retail spec id to its tree's RUNE_TYPE_COLORS entry.
+local SPEC_RUNE_COLOR_INDEX = {
+	[250] = 1, -- Blood
+	[252] = 2, -- Unholy
+	[251] = 3, -- Frost
+}
+
+local RUNE_UPDATE_INTERVAL = 0.1
+
+-- Enum.PowerType field names, as UNIT_POWER_UPDATE/FREQUENT's own powerToken argument spells them.
+local POWER_TOKEN_BY_FIELD = {
+	ComboPoints = "COMBO_POINTS",
+	HolyPower = "HOLY_POWER",
+	Chi = "CHI",
+	SoulShards = "SOUL_SHARDS",
+	ArcaneCharges = "ARCANE_CHARGES",
+	Essence = "ESSENCE",
+	BurningEmbers = "BURNING_EMBERS",
+	ShadowOrbs = "SHADOW_ORBS",
+}
+
+---Hoisted because an inline comparator is a fresh closure per sort, and this one can sort ten
+---times a second.
+local function CompareRuneReadiness(a, b)
+	if a.Ready ~= b.Ready then
+		return a.Ready
+	end
+
+	return a.Remaining < b.Remaining
+end
+
 local function GetConfiguredTexture()
 	if db.Texture == "Blizzard" then
 		return fallbackTexture
@@ -125,6 +164,88 @@ local function GetPowerColor()
 	end
 
 	return 0.2, 0.6, 1.0
+end
+
+local function GetClassColor(unit)
+	local _, class = UnitClass(unit)
+	local c = class and RAID_CLASS_COLORS and RAID_CLASS_COLORS[class]
+
+	if c then
+		return c.r, c.g, c.b
+	end
+end
+
+local function GetClassPowerColor(token, powerType)
+	local cr, cg, cb = GetClassColor("player")
+
+	if cr then
+		return cr, cg, cb
+	end
+
+	local color = PowerBarColor and (PowerBarColor[POWER_TOKEN_BY_FIELD[token]] or PowerBarColor[powerType])
+
+	if color and color.r and color.g and color.b then
+		return color.r, color.g, color.b
+	end
+
+	return GetPowerColor()
+end
+
+---Mainline runes have no type of their own, so they take the tree colour of the spec
+---that spends them.
+local function GetRuneColor(runeType, specId)
+	if WOW_PROJECT_ID == WOW_PROJECT_MAINLINE then
+		local rgb = specId and RUNE_TYPE_COLORS[SPEC_RUNE_COLOR_INDEX[specId]]
+
+		if rgb then
+			return rgb[1], rgb[2], rgb[3]
+		end
+
+		local cr, cg, cb = GetClassColor("player")
+
+		if cr then
+			return cr, cg, cb
+		end
+
+		return GetPowerColor()
+	end
+
+	local rgb = runeType and RUNE_TYPE_COLORS[runeType]
+
+	if rgb then
+		return rgb[1], rgb[2], rgb[3]
+	end
+
+	return GetPowerColor()
+end
+
+-- A live client raises on an event name it doesn't know, so a name this addon added for a
+-- flavour that might not have it goes through here instead of a bare RegisterEvent.
+local function RegisterEventGuarded(frame, event)
+	if C_EventUtils and C_EventUtils.IsEventValid then
+		if C_EventUtils.IsEventValid(event) then
+			frame:RegisterEvent(event)
+		end
+
+		return
+	end
+
+	pcall(frame.RegisterEvent, frame, event)
+end
+
+-- Independent of ShowPower, so a player can hide the power bar and keep the pips.
+local function ResolveClassPower()
+	if not db.ClassPower.Enabled then
+		return nil
+	end
+
+	local info = addon.ClassPower:Resolve()
+
+	if not info or db.ClassPower.Show[info.Key] == false then
+		return nil
+	end
+
+	return info
 end
 
 -- Creates a self-contained bar group for a WoW unit.
@@ -242,17 +363,21 @@ local function CreateBarGroup(unit, containerName, hasPower, getPositionDb)
 
 		local showHealth = not self.hasPower or (db.ShowHealth ~= false)
 		local showPower = self.hasPower and (db.ShowPower ~= false)
+		local showClassPower = self.hasPower and ResolveClassPower() ~= nil
+		local cpHeight = db.ClassPower.Height or 10
 
-		local bars = 0
-		if showHealth then bars = bars + 1 end
-		if showPower then bars = bars + 1 end
+		local rows = 0
+		local rowHeight = 0
+		if showHealth then rows = rows + 1; rowHeight = rowHeight + h end
+		if showPower then rows = rows + 1; rowHeight = rowHeight + h end
+		if showClassPower then rows = rows + 1; rowHeight = rowHeight + cpHeight end
 
-		if bars > 0 then
-			local totalHeight = (h * bars) + ((bars == 2) and gap or 0) + pad * 2
+		-- Event handlers call this after a fade-out, so showing the container here would undo the fade.
+		self.rowsEmpty = rows == 0
+
+		if rows > 0 then
+			local totalHeight = rowHeight + ((rows - 1) * gap) + pad * 2
 			self.container:SetSize(w + pad * 2, totalHeight)
-			self.container:Show()
-		else
-			self.container:Hide()
 		end
 
 		self.healthBar:ClearAllPoints()
@@ -277,6 +402,24 @@ local function CreateBarGroup(unit, containerName, hasPower, getPositionDb)
 			elseif showPower then
 				self.powerBar:SetPoint("TOPLEFT", self.container, "TOPLEFT", pad, -pad)
 				self.powerBar:SetPoint("TOPRIGHT", self.container, "TOPRIGHT", -pad, -pad)
+			end
+		end
+
+		if self.classPowerRow then
+			self.classPowerRow:ClearAllPoints()
+			self.classPowerRow:SetHeight(cpHeight)
+			self.classPowerRow:SetShown(showClassPower)
+
+			if showClassPower then
+				local anchor = (showPower and self.powerBar) or (showHealth and self.healthBar)
+
+				if anchor then
+					self.classPowerRow:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 0, -gap)
+					self.classPowerRow:SetPoint("TOPRIGHT", anchor, "BOTTOMRIGHT", 0, -gap)
+				else
+					self.classPowerRow:SetPoint("TOPLEFT", self.container, "TOPLEFT", pad, -pad)
+					self.classPowerRow:SetPoint("TOPRIGHT", self.container, "TOPRIGHT", -pad, -pad)
+				end
 			end
 		end
 
@@ -425,6 +568,227 @@ local function CreateBarGroup(unit, containerName, hasPower, getPositionDb)
 		end
 	end
 
+	function group:CreateClassPower()
+		self.classPowerRow = CreateFrame("Frame", nil, self.container)
+		self.classPowerRow:SetFrameLevel((self.container:GetFrameLevel() or 0) + 1)
+		self.classPowerBoxes = {}
+	end
+
+	---Creates box i the first time it's needed, so the pool only ever grows to the largest
+	---max this character has shown.
+	function group:GetClassPowerBox(index)
+		local box = self.classPowerBoxes[index]
+
+		if box then
+			return box
+		end
+
+		box = CreateFrame("StatusBar", nil, self.classPowerRow)
+		box.Background = CreateBackground(box)
+		box.Background:SetTexture(GetConfiguredTexture())
+		box:SetStatusBarTexture(GetConfiguredTexture())
+
+		local texture = box:GetStatusBarTexture()
+		if texture then
+			texture:SetHorizTile(false)
+			texture:SetVertTile(false)
+		end
+
+		if db.Border then
+			box.Outline = AddBlackOutline(box)
+		end
+
+		self.classPowerBoxes[index] = box
+
+		return box
+	end
+
+	---The last box is also anchored to the row's right edge so rounding never leaves a ragged end.
+	function group:LayoutClassPowerBoxes(n)
+		local spacing = db.ClassPower.Spacing or 0
+		local rowWidth = db.Width or 150
+		local boxWidth = math.floor((rowWidth - (n - 1) * spacing) / n)
+
+		for i = 1, n do
+			local box = self:GetClassPowerBox(i)
+			box:ClearAllPoints()
+			box:SetHeight(db.ClassPower.Height or 10)
+
+			if i == 1 then
+				box:SetPoint("LEFT", self.classPowerRow, "LEFT", 0, 0)
+			else
+				box:SetPoint("LEFT", self.classPowerBoxes[i - 1], "RIGHT", spacing, 0)
+			end
+
+			if i == n then
+				box:SetPoint("RIGHT", self.classPowerRow, "RIGHT", 0, 0)
+			else
+				box:SetWidth(boxWidth)
+			end
+
+			box:Show()
+		end
+
+		for i = n + 1, #self.classPowerBoxes do
+			self.classPowerBoxes[i]:Hide()
+		end
+	end
+
+	---Skipped when n hasn't moved since the last call, since this runs on every power tick.
+	function group:LayoutClassPowerBoxesIfNeeded(n)
+		if self.classPowerLayoutN == n then
+			return
+		end
+
+		self:LayoutClassPowerBoxes(n)
+		self.classPowerLayoutN = n
+	end
+
+	function group:UpdateClassPowerBoxesForPower(info)
+		local current, max, mod = addon.ClassPower:ReadPower(info)
+		local r, g, b = GetClassPowerColor(info.Token, info.PowerType)
+
+		-- A secret max can't be divided into pips, so it's shown as a single bar spanning the
+		-- row instead.
+		if mini:IsSecret(max) then
+			self:LayoutClassPowerBoxesIfNeeded(1)
+
+			local box = self.classPowerBoxes[1]
+			box:SetMinMaxValues(0, max)
+			box:SetValue(current)
+			SetBarColor(box, r, g, b)
+
+			return
+		end
+
+		local n = max
+		if type(n) ~= "number" or n < 1 then
+			n = 1
+		end
+
+		self:LayoutClassPowerBoxesIfNeeded(n)
+
+		for i = 1, n do
+			local box = self.classPowerBoxes[i]
+			box:SetMinMaxValues((i - 1) * mod, i * mod)
+			box:SetValue(current)
+			SetBarColor(box, r, g, b)
+		end
+	end
+
+	---Only runs while a rune is recharging.
+	function group:SetRuneUpdateEnabled(enabled)
+		if enabled == self.runeUpdateEnabled then
+			return
+		end
+
+		self.runeUpdateEnabled = enabled
+
+		if enabled then
+			self.runeUpdateElapsed = 0
+
+			self.classPowerRow:SetScript("OnUpdate", function(_, elapsed)
+				self.runeUpdateElapsed = self.runeUpdateElapsed + elapsed
+
+				if self.runeUpdateElapsed < RUNE_UPDATE_INTERVAL then
+					return
+				end
+
+				self.runeUpdateElapsed = 0
+				self:UpdateClassPowerRunes()
+			end)
+		else
+			self.classPowerRow:SetScript("OnUpdate", nil)
+		end
+	end
+
+	function group:UpdateClassPowerRunes()
+		self:LayoutClassPowerBoxesIfNeeded(6)
+
+		local now = GetTime()
+
+		-- Reused across calls because this runs ten times a second.
+		if not self.runeStates then
+			self.runeStates = {}
+		end
+
+		local runes = self.runeStates
+
+		for i = 1, 6 do
+			local start, duration, ready, runeType = addon.ClassPower:ReadRune(i)
+			local state = runes[i]
+
+			if not state then
+				state = {}
+				runes[i] = state
+			end
+
+			state.Ready = ready or not duration or duration <= 0
+			state.Start = start
+			state.Duration = duration
+			state.Type = runeType
+			state.Remaining = state.Ready and 0 or math.max(0, (start + duration) - now)
+		end
+
+		-- Mainline reads like Blizzard's own rune bar: ready runes first, then soonest ready.
+		-- Classic pairs are positional, so their order is left alone.
+		if WOW_PROJECT_ID == WOW_PROJECT_MAINLINE then
+			table.sort(runes, CompareRuneReadiness)
+		end
+
+		local anyRecharging = false
+		local specId = WOW_PROJECT_ID == WOW_PROJECT_MAINLINE and addon.ClassPower:CurrentSpecId() or nil
+
+		for slot = 1, 6 do
+			local rune = runes[slot]
+			local box = self.classPowerBoxes[slot]
+			local r, g, b = GetRuneColor(rune.Type, specId)
+
+			if rune.Ready then
+				box:SetMinMaxValues(0, 1)
+				box:SetValue(1)
+			else
+				box:SetMinMaxValues(0, rune.Duration)
+				box:SetValue(now - rune.Start)
+				anyRecharging = true
+			end
+
+			SetBarColor(box, r, g, b)
+		end
+
+		self:SetRuneUpdateEnabled(anyRecharging)
+	end
+
+	function group:UpdateClassPower()
+		if not self.classPowerRow then
+			return
+		end
+
+		local info = ResolveClassPower()
+		local wasShown = self.classPowerRow:IsShown()
+
+		-- Cached so UNIT_POWER_UPDATE/FREQUENT can filter its own token without resolving again
+		-- on every tick. Runes refresh from RUNE_POWER_UPDATE/RUNE_TYPE_UPDATE instead.
+		self.classPowerToken = info and info.Kind ~= "Runes" and info.Token or nil
+
+		self.classPowerRow:SetShown(info ~= nil)
+
+		if not info then
+			self:SetRuneUpdateEnabled(false)
+		elseif info.Kind == "Runes" then
+			self:UpdateClassPowerRunes()
+		else
+			self:SetRuneUpdateEnabled(false)
+			self:UpdateClassPowerBoxesForPower(info)
+		end
+
+		-- Row height doesn't depend on n, so only a shown-state change needs a resize.
+		if (info ~= nil) ~= wasShown then
+			self:UpdateSizes()
+			self:UpdateVisibility()
+		end
+	end
+
 	-- Renders the server's power regen tick. Classic-only: retail regen is continuous, so
 	-- these frames are never created there and the option never appears.
 	function group:CreateTicker()
@@ -516,11 +880,7 @@ local function CreateBarGroup(unit, containerName, hasPower, getPositionDb)
 		local hr, hg, hb
 
 		if db.UseClassColorHealth then
-			local _, class = UnitClass(self.unit)
-			local c = class and RAID_CLASS_COLORS and RAID_CLASS_COLORS[class]
-			if c then
-				hr, hg, hb = c.r, c.g, c.b
-			end
+			hr, hg, hb = GetClassColor(self.unit)
 		end
 
 		if not hr then
@@ -630,6 +990,28 @@ local function CreateBarGroup(unit, containerName, hasPower, getPositionDb)
 		if texture and self.absorbZoneBg then
 			self.absorbZoneBg:SetTexture(texture)
 		end
+
+		if self.classPowerBoxes then
+			for _, box in ipairs(self.classPowerBoxes) do
+				box:SetStatusBarTexture(texture)
+
+				local boxTexture = box:GetStatusBarTexture()
+
+				if boxTexture == nil then
+					box:SetStatusBarTexture(fallbackTexture)
+					boxTexture = box:GetStatusBarTexture()
+				end
+
+				if boxTexture then
+					boxTexture:SetHorizTile(false)
+					boxTexture:SetVertTile(false)
+				end
+
+				if texture and box.Background then
+					box.Background:SetTexture(texture)
+				end
+			end
+		end
 	end
 
 	function group:UpdateFonts()
@@ -648,6 +1030,13 @@ local function CreateBarGroup(unit, containerName, hasPower, getPositionDb)
 				self.container.IsShowing = false
 				return
 			end
+		end
+
+		if self.rowsEmpty then
+			self.container:SetAlpha(0)
+			self.container:Hide()
+			self.container.IsShowing = false
+			return
 		end
 
 		if db.AlwaysShow then
@@ -730,6 +1119,7 @@ local function CreateBarGroup(unit, containerName, hasPower, getPositionDb)
 		if self.hasPower then
 			self.powerBar = CreateFrame("StatusBar", nil, self.container)
 			self.powerBar.Background = CreateBackground(self.powerBar)
+			self:CreateClassPower()
 		end
 
 		self:UpdateTextures()
@@ -787,6 +1177,10 @@ local function CreateBarGroup(unit, containerName, hasPower, getPositionDb)
 	end
 
 	function group:Reload()
+		-- A settings change can move Width, Spacing or the class power Height without changing
+		-- the box count, so the cache that skips re-layout on an unchanged count can't be trusted here.
+		self.classPowerLayoutN = nil
+
 		self:ApplyPosition()
 		self:UpdateSizes()
 		self:UpdateColors()
@@ -794,6 +1188,7 @@ local function CreateBarGroup(unit, containerName, hasPower, getPositionDb)
 		self:UpdateHealth()
 		self:UpdateAbsorb()
 		self:UpdatePower()
+		self:UpdateClassPower()
 		self:UpdateTextures()
 		self:UpdateFonts()
 	end
@@ -811,15 +1206,17 @@ local function Load()
 	addon:Reload()
 end
 
-local function OnEvent(_, event, arg1)
+local function OnEvent(_, event, arg1, arg2)
 	if event == "PLAYER_ENTERING_WORLD" then
 		-- A zone change can put an arbitrary gap between the last observed tick and the next,
 		-- so the cadence has to restart from scratch.
 		addon.PowerTick:Reset()
-		playerGroup:UpdateVisibility()
 		playerGroup:UpdateHealth()
 		playerGroup:UpdateAbsorb()
 		playerGroup:UpdatePower()
+		playerGroup:UpdateSizes()
+		playerGroup:UpdateClassPower()
+		playerGroup:UpdateVisibility()
 		petGroup:UpdateVisibility()
 		petGroup:UpdateHealth()
 		petGroup:UpdateAbsorb()
@@ -841,10 +1238,52 @@ local function OnEvent(_, event, arg1)
 		return
 	end
 
-	if event == "UNIT_POWER_UPDATE" or event == "UNIT_POWER_FREQUENT" or event == "UNIT_DISPLAYPOWER" then
+	if event == "UNIT_POWER_UPDATE" or event == "UNIT_POWER_FREQUENT" then
 		if arg1 == "player" then
 			playerGroup:UpdatePower()
+
+			if db.ClassPower.Enabled and arg2 == POWER_TOKEN_BY_FIELD[playerGroup.classPowerToken] then
+				playerGroup:UpdateClassPower()
+			end
 		end
+		return
+	end
+
+	if event == "UNIT_DISPLAYPOWER" then
+		if arg1 == "player" then
+			playerGroup:UpdatePower()
+			playerGroup:UpdateSizes()
+			playerGroup:UpdateVisibility()
+			playerGroup:UpdateClassPower()
+		end
+		return
+	end
+
+	if event == "UNIT_MAXPOWER" then
+		if arg1 == "player" then
+			playerGroup:UpdateSizes()
+			playerGroup:UpdateVisibility()
+			playerGroup:UpdateClassPower()
+		end
+		return
+	end
+
+	if event == "PLAYER_SPECIALIZATION_CHANGED" then
+		if arg1 == "player" then
+			playerGroup:UpdateSizes()
+			playerGroup:UpdateVisibility()
+			playerGroup:UpdateClassPower()
+		end
+		return
+	end
+
+	if event == "RUNE_POWER_UPDATE" or event == "RUNE_TYPE_UPDATE" then
+		playerGroup:UpdateClassPower()
+		return
+	end
+
+	if event == "PLAYER_TARGET_CHANGED" or event == "UNIT_COMBO_POINTS" then
+		playerGroup:UpdateClassPower()
 		return
 	end
 
@@ -898,6 +1337,7 @@ local function OnAddonLoaded()
 				eventsFrame:RegisterUnitEvent("UNIT_POWER_UPDATE", "player")
 				eventsFrame:RegisterUnitEvent("UNIT_POWER_FREQUENT", "player")
 				eventsFrame:RegisterUnitEvent("UNIT_DISPLAYPOWER", "player")
+				eventsFrame:RegisterUnitEvent("UNIT_MAXPOWER", "player")
 				eventsFrame:RegisterUnitEvent("UNIT_ABSORB_AMOUNT_CHANGED", "player", "pet")
 				eventsFrame:RegisterUnitEvent("UNIT_HEAL_ABSORB_AMOUNT_CHANGED", "player", "pet")
 				eventsFrame:RegisterUnitEvent("UNIT_HEAL_PREDICTION", "player", "pet")
@@ -906,9 +1346,22 @@ local function OnAddonLoaded()
 				eventsFrame:RegisterEvent("UNIT_POWER_UPDATE")
 				eventsFrame:RegisterEvent("UNIT_POWER_FREQUENT")
 				eventsFrame:RegisterEvent("UNIT_DISPLAYPOWER")
+				eventsFrame:RegisterEvent("UNIT_MAXPOWER")
 				eventsFrame:RegisterEvent("UNIT_ABSORB_AMOUNT_CHANGED")
 				eventsFrame:RegisterEvent("UNIT_HEAL_ABSORB_AMOUNT_CHANGED")
 				eventsFrame:RegisterEvent("UNIT_HEAL_PREDICTION")
+			end
+
+			RegisterEventGuarded(eventsFrame, "PLAYER_SPECIALIZATION_CHANGED")
+			RegisterEventGuarded(eventsFrame, "RUNE_POWER_UPDATE")
+			RegisterEventGuarded(eventsFrame, "RUNE_TYPE_UPDATE")
+
+			if WOW_PROJECT_ID ~= WOW_PROJECT_MAINLINE then
+				eventsFrame:RegisterEvent("PLAYER_TARGET_CHANGED")
+
+				-- Wrath and Cata Classic can still fire this legacy event for a same-target
+				-- combo point change, alongside or instead of UNIT_POWER_UPDATE.
+				RegisterEventGuarded(eventsFrame, "UNIT_COMBO_POINTS")
 			end
 
 			eventsFrame:SetScript("OnEvent", OnEvent)

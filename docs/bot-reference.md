@@ -28,6 +28,7 @@ A simple personal-resource-style display: a movable health bar and power (mana/e
 - Pet bar: a separate health-only bar for your pet (no pet power bar). Off by default; only shows while a pet exists, and follows the same combat show/hide rules as the player bars. It has its own size and position but shares texture, text, colour and other appearance settings.
 - Bar texture: chosen from LibSharedMedia "statusbar" textures. The default "Blizzard" is the stock UI status bar texture. Textures registered by other addons (e.g. SharedMedia) appear in the dropdown automatically, each row previewing its own texture next to the name; the list refreshes when the panel is opened. If a texture pack registers after login, the bars pick up the change automatically without a reload.
 - Power tick (Classic clients only): a vertical marker sweeps across the power bar and restarts on every server regen tick (2 second cadence). Mana and energy only. The marker hides at full power, and for mana it hides while the five second rule is active and until the next real tick reveals the cadence. Energy ticks are recognised by the 20-energy tick amount (40 with Adrenaline Rush), so procs and refunds are ignored.
+- Class power: a row of pips under the power bar for combo points, holy power, soul shards, chi, arcane charges, essence, and runes. On by default; per-spec visibility lets you hide it for specs that do not use the resource.
 
 The display loads after you first enter the world, so it appears shortly after the loading screen, not at the login screen.
 
@@ -92,6 +93,15 @@ Look & Feel section:
 | Thickness | 2 | 1-10, step 1 |
 | Colour (swatch) | White, opacity 1 | Marker colour and opacity |
 
+### Class Power subpanel
+
+| Option | Default | Notes |
+|---|---|---|
+| Show class power | On | Row of pips under the power bar for combo points, holy power, soul shards, chi, arcane charges, essence or runes, whichever applies to your class. Pips use your class colour, except retail Death Knight runes, which follow your spec colour |
+| Show on (per spec/class checkboxes) | On | One checkbox per spec (or per class where the resource isn't spec-gated) that has the resource on this client; unticking one hides the row on that spec |
+| Height | 10 | 4-30, step 1 |
+| Spacing | 2 | 0-10, step 1 (gap between pips) |
+
 ### Misc subpanel
 
 | Option | Default | Range / notes |
@@ -122,6 +132,7 @@ These exist in MiniResourceDisplayDB but have no options widget:
 - Power tick: only on Classic-lineage clients (Classic Era, TBC Classic, Wrath Classic, Cataclysm Classic, Mists Classic). On retail the Power Tick panel, the `/mrd tick` command, and the marker do not exist, because retail regen is continuous.
 - On Midnight clients the addon uses the game's heal prediction calculator for absorbs and incoming heals instead of direct arithmetic; behaviour is the same for the user.
 - Percent text uses the game's own percentage APIs where available, with a manual calculation as fallback on older clients.
+- Class power: which resource shows, and whether it is keyed by spec or by class, depends on the client. Mists Classic gets chi on every spec plus burning embers/shadow orbs on their one spec each; other Classic clients before Mists have no spec API, so a resource only appears once the client's own max power confirms it exists (holy power and soul shards are absent before those clients added them), and rows are keyed by class rather than spec. Every non-mainline client reads combo points from the target rather than the player, refreshing on target change. Runes show on Death Knights on every client that has them.
 
 ## Troubleshooting by symptom
 

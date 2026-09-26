@@ -88,6 +88,13 @@ local dbDefaults = {
 		Y = -165,
 		Locked = false,
 	},
+
+	ClassPower = {
+		Enabled = true,
+		Height = 10,
+		Spacing = 2,
+		Show = addon.ClassPower:DefaultShow(),
+	},
 }
 ---@class Config
 local M = {}
@@ -580,6 +587,118 @@ function M:Init()
 	ihPanel:HookScript("OnShow", function()
 		ihSwatch:MiniRefresh()
 	end)
+
+	local classPowerPanel = CreateFrame("Frame")
+	classPowerPanel.name = "Class Power"
+	mini:AddSubCategory(category, classPowerPanel)
+	panels[#panels + 1] = classPowerPanel
+
+	local cpHeader = mini:PanelHeader({
+		Parent = classPowerPanel,
+		Title = "Class Power",
+		Description = "Shows combo points, holy power, runes and other class resources under the power bar.",
+		Gap = 6,
+		Divider = "Settings",
+	})
+
+	local cpEnabledChk = mini:Checkbox({
+		Parent = classPowerPanel,
+		LabelText = "Show class power",
+		Tooltip = "Shows combo points, holy power, runes and other class resources under the power bar.",
+		GetValue = function()
+			return db.ClassPower.Enabled
+		end,
+		SetValue = function(value)
+			db.ClassPower.Enabled = value
+			addon:Reload()
+		end,
+	})
+
+	cpEnabledChk:SetPoint("TOPLEFT", cpHeader.Anchor, "BOTTOMLEFT", 0, -verticalSpacing)
+
+	local cpShowDivider = mini:Divider({
+		Parent = classPowerPanel,
+		Text = "Show on",
+	})
+
+	cpShowDivider:SetPoint("TOP", cpEnabledChk, "BOTTOM", 0, -verticalSpacing)
+	cpShowDivider:SetPoint("LEFT", classPowerPanel, "LEFT")
+	cpShowDivider:SetPoint("RIGHT", classPowerPanel, "RIGHT", -horizontalSpacing, 0)
+
+	local cpEntries = addon.ClassPower:VisibilityEntries()
+	local cpSizeAnchor = cpShowDivider
+
+	if #cpEntries == 0 then
+		local cpNoneText = classPowerPanel:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
+		cpNoneText:SetPoint("TOPLEFT", cpShowDivider, "BOTTOMLEFT", 0, -verticalSpacing)
+		cpNoneText:SetText("Your class has no class power on this client.")
+		cpSizeAnchor = cpNoneText
+	else
+		for i, entry in ipairs(cpEntries) do
+			local chk = mini:Checkbox({
+				Parent = classPowerPanel,
+				LabelText = entry.Label,
+				GetValue = function()
+					return db.ClassPower.Show[entry.Key] ~= false
+				end,
+				SetValue = function(value)
+					db.ClassPower.Show[entry.Key] = value
+					addon:Reload()
+				end,
+			})
+
+			chk:SetPoint("TOPLEFT", cpShowDivider, "BOTTOMLEFT", (i - 1) * columnStep, -verticalSpacing)
+
+			if i == 1 then
+				cpSizeAnchor = chk
+			end
+		end
+	end
+
+	local cpSizeDivider = mini:Divider({
+		Parent = classPowerPanel,
+		Text = "Size",
+	})
+
+	cpSizeDivider:SetPoint("TOP", cpSizeAnchor, "BOTTOM", 0, -verticalSpacing)
+	cpSizeDivider:SetPoint("LEFT", classPowerPanel, "LEFT")
+	cpSizeDivider:SetPoint("RIGHT", classPowerPanel, "RIGHT", -horizontalSpacing, 0)
+
+	local cpHeightSlider = mini:Slider({
+		Parent = classPowerPanel,
+		Min = 4,
+		Max = 30,
+		Step = 1,
+		Width = sliderWidth,
+		LabelText = "Height",
+		GetValue = function()
+			return db.ClassPower.Height
+		end,
+		SetValue = function(value)
+			db.ClassPower.Height = mini:ClampInt(value, 4, 30, dbDefaults.ClassPower.Height)
+			addon:Reload()
+		end,
+	})
+
+	cpHeightSlider.Slider:SetPoint("TOPLEFT", cpSizeDivider, "BOTTOMLEFT", 0, -verticalSpacing * 3)
+
+	local cpSpacingSlider = mini:Slider({
+		Parent = classPowerPanel,
+		Min = 0,
+		Max = 10,
+		Step = 1,
+		Width = sliderWidth,
+		LabelText = "Spacing",
+		GetValue = function()
+			return db.ClassPower.Spacing
+		end,
+		SetValue = function(value)
+			db.ClassPower.Spacing = mini:ClampInt(value, 0, 10, dbDefaults.ClassPower.Spacing)
+			addon:Reload()
+		end,
+	})
+
+	cpSpacingSlider.Slider:SetPoint("LEFT", cpHeightSlider.Slider, "RIGHT", horizontalSpacing, 0)
 
 	-- Power Tick subcategory. Classic only - retail regen is continuous rather than ticked,
 	-- so there is nothing to point at and the panel isn't created there at all.

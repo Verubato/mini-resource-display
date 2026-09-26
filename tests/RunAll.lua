@@ -14,6 +14,7 @@ local testFiles = {
 	"tests/TestPowerTick.lua",
 	"tests/TestConfig.lua",
 	"tests/TestBarGroup.lua",
+	"tests/TestClassPower.lua",
 	-- Last: the smoke test installs a clean client over whatever the suites above left.
 	"tests/TestSmoke.lua",
 }

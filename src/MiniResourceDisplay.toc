@@ -15,5 +15,6 @@ Libs\LibSharedMedia-3.0\LibSharedMedia-3.0.lua
 Libs\LibUIDropDownMenu\LibUIDropDownMenu.lua
 Libs\MiniFramework\MiniFramework.xml
 PowerTick.lua
+ClassPower.lua
 Config.lua
 MiniResourceDisplay.lua

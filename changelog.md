@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.8.9
+
+Added class power (combo points, holy power, runes, and more) under the power bar, with per-spec visibility.
+
 ## 2.8.8
 
 Added WoW Forever support.

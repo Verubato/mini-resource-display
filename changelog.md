@@ -2,7 +2,7 @@
 
 ## 2.8.9
 
-Added class power (combo points, holy power, runes, and more) under the power bar, with per-spec visibility.
+Added class power support.
 
 ## 2.8.8
 

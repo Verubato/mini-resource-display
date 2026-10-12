@@ -489,6 +489,9 @@ local function CreateBarGroup(unit, containerName, hasPower, getPositionDb)
 		if self.regularAbsorbBar then self.regularAbsorbBar:SetShown(shieldsEnabled) end
 		if self.absorbZoneBgFrame then self.absorbZoneBgFrame:SetShown(shieldsEnabled) end
 
+		local incomingEnabled = db.ShowIncomingHeal ~= false
+		if self.incomingHealBar then self.incomingHealBar:SetShown(incomingEnabled) end
+
 		local maxHealth = UnitHealthMax(self.unit) or 0
 		local totalAbsorbs = UnitGetTotalAbsorbs(self.unit) or 0
 
@@ -507,7 +510,7 @@ local function CreateBarGroup(unit, containerName, hasPower, getPositionDb)
 				if self.absorbZoneBgFrame then self.absorbZoneBgFrame:SetAlphaFromBoolean(clamped, 0, 1) end
 				self.overshieldBar:SetValue(totalAbsorbs)
 				self.overshieldBar:SetAlphaFromBoolean(clamped, overshieldOpacity, 0)
-				if self.incomingHealBar then
+				if self.incomingHealBar and incomingEnabled then
 					local incomingAmount = self.healPredictionCalc:GetIncomingHeals()
 					self.incomingHealBar:SetMinMaxValues(0, missingHealth)
 					self.incomingHealBar:SetValue(incomingAmount)
@@ -525,7 +528,7 @@ local function CreateBarGroup(unit, containerName, hasPower, getPositionDb)
 				if self.absorbZoneBgFrame then self.absorbZoneBgFrame:SetAlpha(hasOvershield and 0 or 1) end
 				self.overshieldBar:SetValue(math.max(0, totalAbsorbs - remaining))
 				self.overshieldBar:SetAlpha(hasOvershield and overshieldOpacity or 0)
-				if self.incomingHealBar then
+				if self.incomingHealBar and incomingEnabled then
 					local incomingHeals = UnitGetIncomingHeals and UnitGetIncomingHeals(self.unit) or 0
 					self.incomingHealBar:SetMinMaxValues(0, remaining)
 					self.incomingHealBar:SetValue(math.min(incomingHeals, remaining))

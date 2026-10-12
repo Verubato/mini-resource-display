@@ -65,6 +65,7 @@ local dbDefaults = {
 		Opacity = 1,
 	},
 
+	ShowIncomingHeal = true,
 	IncomingHealColor = { 0, 1, 0 },
 
 	-- Classic-only; ignored and never shown in the options on retail, where power regen
@@ -540,16 +541,32 @@ function M:Init()
 	local ihHeader = mini:PanelHeader({
 		Parent = ihPanel,
 		Title = "Incoming Heals",
-		Description = "Configure the colour of the incoming heal prediction bar.",
+		Description = "Configure the incoming heal prediction bar.",
 		Gap = 6,
+		Divider = "Settings",
 	})
+
+	local ihEnabledChk = mini:Checkbox({
+		Parent = ihPanel,
+		LabelText = "Show incoming heals",
+		Tooltip = "Whether to show the incoming heal prediction on the health bar.",
+		GetValue = function()
+			return db.ShowIncomingHeal
+		end,
+		SetValue = function(value)
+			db.ShowIncomingHeal = value
+			addon:Reload()
+		end,
+	})
+
+	ihEnabledChk:SetPoint("TOPLEFT", ihHeader.Anchor, "BOTTOMLEFT", 0, -verticalSpacing)
 
 	local ihDivider = mini:Divider({
 		Parent = ihPanel,
 		Text = "Colour",
 	})
 
-	ihDivider:SetPoint("TOP", ihHeader.Anchor, "BOTTOM", 0, -verticalSpacing)
+	ihDivider:SetPoint("TOP", ihEnabledChk, "BOTTOM", 0, -verticalSpacing)
 	ihDivider:SetPoint("LEFT", ihPanel, "LEFT")
 	ihDivider:SetPoint("RIGHT", ihPanel, "RIGHT", -horizontalSpacing, 0)
 

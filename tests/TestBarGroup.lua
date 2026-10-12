@@ -1,5 +1,5 @@
--- Covers GetPowerColor's priority cascade, GetConfiguredTexture's LSM lookup, and the
--- FadeTo state machine, none of which TestConfig.lua or TestPowerTick.lua reach.
+-- Covers GetPowerColor's priority cascade, GetConfiguredTexture's LSM lookup, the FadeTo state
+-- machine, and the incoming heal option, none of which TestConfig.lua or TestPowerTick.lua reach.
 --
 -- These are file-local to MiniResourceDisplay.lua, so every test drives them through the
 -- events and public API a real client would use rather than reaching in directly.
@@ -206,5 +206,68 @@ fw.describe("FadeTo state machine", function()
 		WowMock.FireEvent("PLAYER_REGEN_DISABLED")
 
 		fw.falsy(container.FadeIn:IsPlaying(), "fade in was not replayed")
+	end)
+end)
+
+---The incoming heal bar is the second StatusBar parented to the container, after health.
+---@return table?
+local function FindIncomingHealBar()
+	local container = FindContainer()
+	local seen = 0
+
+	for _, frame in ipairs(WowMock.Frames) do
+		if frame:GetObjectType() == "StatusBar" and frame:GetParent() == container then
+			seen = seen + 1
+			if seen == 2 then
+				return frame
+			end
+		end
+	end
+end
+
+fw.describe("Incoming heal prediction option", function()
+	local realIncoming = _G.UnitGetIncomingHeals
+	local realHealth = _G.UnitHealth
+
+	fw.it("defaults to on and shows the bar", function()
+		local context = harness.Load("MiniResourceDisplay")
+		harness.Login(context)
+
+		fw.eq(_G.MiniResourceDisplayDB.ShowIncomingHeal, true, "default")
+		fw.truthy(FindIncomingHealBar():IsShown(), "bar shown")
+	end)
+
+	fw.it("hides the bar and skips the heal data when off", function()
+		local context = harness.Load("MiniResourceDisplay")
+		harness.Login(context)
+
+		-- Missing health has to cover the heal, or the calculator caps it to 0 either way.
+		_G.UnitHealth = function()
+			return 50
+		end
+		_G.UnitGetIncomingHeals = function()
+			return 50
+		end
+		_G.MiniResourceDisplayDB.ShowIncomingHeal = false
+		context.Addon:Reload()
+
+		local bar = FindIncomingHealBar()
+		_G.UnitGetIncomingHeals = realIncoming
+		_G.UnitHealth = realHealth
+
+		fw.falsy(bar:IsShown(), "bar hidden")
+		fw.eq(bar:GetValue(), 0, "no heal value pushed to the bar")
+	end)
+
+	fw.it("shows the bar again without a reload when turned back on", function()
+		local context = harness.Load("MiniResourceDisplay")
+		harness.Login(context)
+
+		_G.MiniResourceDisplayDB.ShowIncomingHeal = false
+		context.Addon:Reload()
+		_G.MiniResourceDisplayDB.ShowIncomingHeal = true
+		context.Addon:Reload()
+
+		fw.truthy(FindIncomingHealBar():IsShown(), "bar shown again")
 	end)
 end)

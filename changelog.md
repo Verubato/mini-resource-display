@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.9.0
+
+- Added a stagger overlay on the health bar for Brewmaster monks, with its own colour.
+- Added an option to hide the incoming heal prediction.
+
 ## 2.8.9
 
 Added class power support.

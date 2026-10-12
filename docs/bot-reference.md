@@ -1,6 +1,6 @@
 # MiniResourceDisplay bot reference
 
-Addon: MiniResourceDisplay, version 2.9.0, by Verz.
+Addon: MiniResourceDisplay, version 2.10.0, by Verz.
 Supported interface versions (from the .toc): 120100, 16001, 50504, 40402, 38002, 38000, 30405, 30300, 20506, 11509. This covers retail (12.1.0), WoW Forever (1.60), and the Classic clients (Mists Classic, Cataclysm Classic, Wrath Classic, TBC Classic, Classic Era).
 Saved variables: MiniResourceDisplayDB (account wide). Bundled libraries: LibStub, CallbackHandler-1.0, LibSharedMedia-3.0, LibUIDropDownMenu, MiniFramework.
 
@@ -19,13 +19,13 @@ A simple personal-resource-style display: a movable health bar and power (mana/e
 
 - Player bars: a health bar with a power bar below it, in a shared container. Either bar can be hidden. Bar fill animates smoothly on clients that support status bar interpolation.
 - Visibility: by default the display only shows in combat, fading in when combat starts and out when it ends (1 second each way). "Always show" keeps it visible; out of combat it then uses the "Out of combat opacity" value.
-- Moving: drag the bars with the left mouse button; position is saved. The "Locked" checkbox locks all bars (a locked frame also ignores the mouse). The player display defaults to screen centre, 140 pixels down; the pet bar to 165 pixels down.
+- Moving: drag the bars with the left mouse button; position is saved. The "Locked" checkbox locks all bars (a locked frame also ignores the mouse). The player display's top edge defaults to 123 pixels below screen centre; the pet bar's to 155.5 pixels below. Positions are kept by the top edge, so when a row appears or disappears (class power pips in cat form, the stagger bar) the display grows or shrinks downward and the top stays put. Positions saved by 2.9.0 or earlier are converted to the top edge once on the first load, without moving the bars.
 - Text: current/max values on each bar, abbreviated for large numbers (e.g. "1.2K"). "Percentages" switches to percent. "Hide text suffix" drops the "%" and abbreviation suffixes and shows raw numbers.
 - Health colour: green by default, or your class colour with "Class color health".
 - Power colour: follows the standard Blizzard colour for your current power type (mana blue, rage red, energy yellow, and so on) by default.
 - Shields (absorbs): a shield overlay fills the empty part of the health bar for absorbs; when absorbs exceed missing health, an overshield overlay fills backwards from the right edge of the bar. Colour and opacity are configurable; the whole indicator can be turned off.
 - Incoming heals: a prediction bar in the empty part of the health bar for heals in flight, colour configurable (green by default). It can be turned off.
-- Stagger (Brewmaster monks only): a segment at the right end of the health fill showing the damage still to come from stagger, so its width is staggered damage as a share of max health. It updates on health, absorb and aura changes, and on spec change. One configurable colour (pale yellow by default); there is no light/moderate/heavy grading. Shield overlays draw above it.
+- Stagger (Brewmaster monks only): a separate bar under the power bar, in Blizzard's order of health, power, then stagger. It fills with the damage still to come from stagger as a share of max health. It has text that follows Show text, Percentages and Hide text suffix, and on retail it shows the plain amount even with Percentages on, because the game hides the stagger amount from addon arithmetic. It updates on health, absorb and aura changes, and on spec change. One configurable colour (pale yellow by default); there is no light/moderate/heavy grading. On Mists Classic the chi row sits under it.
 - Pet bar: a separate health-only bar for your pet (no pet power bar). Off by default; only shows while a pet exists, and follows the same combat show/hide rules as the player bars. It has its own size and position but shares texture, text, colour and other appearance settings.
 - Bar texture: chosen from LibSharedMedia "statusbar" textures. The default "Blizzard" is the stock UI status bar texture. Textures registered by other addons (e.g. SharedMedia) appear in the dropdown automatically, each row previewing its own texture next to the name; the list refreshes when the panel is opened. If a texture pack registers after login, the bars pick up the change automatically without a reload.
 - Power tick (Classic clients only): a vertical marker sweeps across the power bar and restarts on every server regen tick (2 second cadence). Mana and energy only. The marker hides at full power, and for mana it hides while the five second rule is active and until the next real tick reveals the cadence. Energy ticks are recognised by the 20-energy tick amount (40 with Adrenaline Rush), so procs and refunds are ignored.
@@ -91,8 +91,9 @@ Look & Feel section:
 
 | Option | Default | What it does |
 |---|---|---|
-| Show stagger | On | Show the damage still to come from stagger at the end of the health bar. Only Brewmasters see it |
-| Colour (swatch) | Pale yellow (1, 0.98, 0.72) | Colour of the stagger segment (no opacity control) |
+| Show stagger | On | Show a bar under the power bar for the damage still to come from stagger, measured against max health. Only Brewmasters see it |
+| Colour (swatch) | Pale yellow (1, 0.98, 0.72) | Colour of the stagger bar (no opacity control) |
+| Height | 10 | 8-50, step 1 |
 
 ### Power Tick subpanel (Classic clients only; panel does not exist on retail)
 
@@ -139,7 +140,7 @@ These exist in MiniResourceDisplayDB but have no options widget:
 ## Version-gated behaviour
 
 - Power tick: only on Classic-lineage clients (Classic Era, TBC Classic, Wrath Classic, Cataclysm Classic, Mists Classic). On retail the Power Tick panel, the `/mrd tick` command, and the marker do not exist, because retail regen is continuous. WoW Forever does not get it either: it does regen in ticks, but the game hides power values from addons there, so a tick cannot be detected.
-- Stagger: only for monks on clients with the stagger API (retail and Mists Classic). On retail the stagger amount is hidden from addon arithmetic, so the segment is sized by the game itself.
+- Stagger: only for monks on clients with the stagger API (retail and Mists Classic). On retail the stagger amount is hidden from addon arithmetic, so the bar is filled by the game itself and its text shows the amount rather than a percent.
 - On Midnight clients the addon uses the game's heal prediction calculator for absorbs and incoming heals instead of direct arithmetic; behaviour is the same for the user.
 - Percent text uses the game's own percentage APIs where available, with a manual calculation as fallback on older clients.
 - Class power: which resource shows, and whether it is keyed by spec or by class, depends on the client. Mists Classic gets chi on every spec plus burning embers/shadow orbs on their one spec each; other Classic clients before Mists have no spec API, so a resource only appears once the client's own max power confirms it exists (holy power and soul shards are absent before those clients added them), and rows are keyed by class rather than spec. Every non-mainline client reads combo points from the target rather than the player, refreshing on target change. Runes show on Death Knights on every client that has them.
@@ -154,7 +155,7 @@ These exist in MiniResourceDisplayDB but have no options widget:
 - No power tick marker: it exists on Classic clients only, and not on WoW Forever. It also hides at full power, and for mana it hides during the five second rule after spending mana and stays hidden until the next real regen tick is observed. Rage, focus and runic power never tick. `/mrd tick` prints what the detector currently sees.
 - Power tick marker seems out of sync: the cadence is inferred from observed regen gains, so it needs a tick or two to lock on after zoning or switching forms/power type. `/mrd tick` shows the recent gain intervals.
 - Texture I want is not in the dropdown: only LibSharedMedia "statusbar" textures appear. Install an addon that registers them (e.g. SharedMedia) and reopen the settings panel; the list refreshes on open.
-- No stagger segment: you must be a monk in the Brewmaster spec, "Show stagger" on the Stagger panel must be on, and you must have damage staggered. The panel only exists for monks on retail and Mists Classic.
+- No stagger bar: you must be a monk in the Brewmaster spec, "Show stagger" on the Stagger panel must be on, and you must have damage staggered. The panel only exists for monks on retail and Mists Classic.
 - No incoming heal bar: "Show incoming heals" on the Incoming Heals panel must be on.
 - No shield/absorb overlay: "Show shields" on the Shield panel must be on, and the unit must actually have an absorb.
 - Text shows numbers instead of percent (or the reverse): toggle "Percentages" on the main panel. "Hide text suffix" removes the "%" sign and abbreviation letters.

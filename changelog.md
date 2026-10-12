@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.10.0
+
+- Stagger is now its own bar under the power bar, like Blizzard's, with text and a height option.
+- The display now grows downward from a fixed top edge when rows like class power appear, instead of growing from the middle.
+
 ## 2.9.0
 
 - Added a stagger overlay on the health bar for Brewmaster monks, with its own colour.

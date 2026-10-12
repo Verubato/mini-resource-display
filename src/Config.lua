@@ -68,6 +68,9 @@ local dbDefaults = {
 	ShowIncomingHeal = true,
 	IncomingHealColor = { 0, 1, 0 },
 
+	ShowStagger = true,
+	StaggerColor = { 1, 0.98, 0.72 },
+
 	-- Classic-only; ignored and never shown in the options on retail, where power regen
 	-- is continuous rather than ticked.
 	Ticker = {
@@ -604,6 +607,78 @@ function M:Init()
 	ihPanel:HookScript("OnShow", function()
 		ihSwatch:MiniRefresh()
 	end)
+
+	if addon:HasStagger() then
+		local staggerPanel = CreateFrame("Frame")
+		staggerPanel.name = "Stagger"
+		mini:AddSubCategory(category, staggerPanel)
+		panels[#panels + 1] = staggerPanel
+
+		local staggerHeader = mini:PanelHeader({
+			Parent = staggerPanel,
+			Title = "Stagger",
+			Description = "Shows a Brewmaster's staggered damage on the health bar.",
+			Gap = 6,
+			Divider = "Settings",
+		})
+
+		local staggerEnabledChk = mini:Checkbox({
+			Parent = staggerPanel,
+			LabelText = "Show stagger",
+			Tooltip = "Whether to show the damage still to come from stagger at the end of the health bar.",
+			GetValue = function()
+				return db.ShowStagger
+			end,
+			SetValue = function(value)
+				db.ShowStagger = value
+				addon:Reload()
+			end,
+		})
+
+		staggerEnabledChk:SetPoint("TOPLEFT", staggerHeader.Anchor, "BOTTOMLEFT", 0, -verticalSpacing)
+
+		local staggerDivider = mini:Divider({
+			Parent = staggerPanel,
+			Text = "Colour",
+		})
+
+		staggerDivider:SetPoint("TOP", staggerEnabledChk, "BOTTOM", 0, -verticalSpacing)
+		staggerDivider:SetPoint("LEFT", staggerPanel, "LEFT")
+		staggerDivider:SetPoint("RIGHT", staggerPanel, "RIGHT", -horizontalSpacing, 0)
+
+		local staggerSwatch = mini:ColorSwatch({
+			Parent = staggerPanel,
+			LabelText = "Colour",
+			Tooltip = "Click to change colour",
+			Size = 24,
+			HasOpacity = false,
+			GetValue = function()
+				local c = db.StaggerColor
+				return c[1] or 1, c[2] or 0.98, c[3] or 0.72, 1
+			end,
+			SetValue = function(r, g, b)
+				db.StaggerColor[1] = r
+				db.StaggerColor[2] = g
+				db.StaggerColor[3] = b
+			end,
+			OnChange = function()
+				addon:Reload()
+			end,
+		})
+
+		-- The swatch puts its label on its right by default, and this panel wants it on the left.
+		staggerSwatch.Label:ClearAllPoints()
+		staggerSwatch.Label:SetPoint("TOPLEFT", staggerDivider, "BOTTOMLEFT", 0, -verticalSpacing)
+		staggerSwatch:SetPoint("LEFT", staggerSwatch.Label, "RIGHT", 8, 0)
+
+		local staggerSwatchHint = staggerPanel:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
+		staggerSwatchHint:SetPoint("LEFT", staggerSwatch, "RIGHT", 8, 0)
+		staggerSwatchHint:SetText("Click to change colour")
+
+		staggerPanel:HookScript("OnShow", function()
+			staggerSwatch:MiniRefresh()
+		end)
+	end
 
 	local classPowerPanel = CreateFrame("Frame")
 	classPowerPanel.name = "Class Power"

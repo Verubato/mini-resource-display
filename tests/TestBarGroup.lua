@@ -1,5 +1,5 @@
 -- Covers GetPowerColor's priority cascade, GetConfiguredTexture's LSM lookup, the FadeTo state
--- machine, and the incoming heal option, none of which TestConfig.lua or TestPowerTick.lua reach.
+-- machine, the incoming heal option, and the stagger overlay, none of which other suites reach.
 --
 -- These are file-local to MiniResourceDisplay.lua, so every test drives them through the
 -- events and public API a real client would use rather than reaching in directly.
@@ -15,8 +15,7 @@ local function FindContainer()
 end
 
 ---StatusBars are created against the container in a fixed order: health, incoming heal,
----regular absorb, overshield, then power last. The power bar is the only one still needed
----here, so it is picked out as whichever StatusBar was created last.
+---regular absorb, absorb backing, overshield, stagger, then power last.
 ---@return table?
 local function FindPowerBar()
 	local container = FindContainer()
@@ -269,5 +268,216 @@ fw.describe("Incoming heal prediction option", function()
 		context.Addon:Reload()
 
 		fw.truthy(FindIncomingHealBar():IsShown(), "bar shown again")
+	end)
+end)
+
+---The stagger bar is the only one pinned to the health bar's own top left, since it fills back
+---from the health fill. Position in the creation order can't tell it apart once it may be absent.
+---@param container table? defaults to the player's container
+---@return table?
+local function FindStaggerBar(container)
+	container = container or FindContainer()
+	local healthBar
+
+	for _, frame in ipairs(WowMock.Frames) do
+		if frame:GetObjectType() == "StatusBar" and frame:GetParent() == container then
+			if not healthBar then
+				healthBar = frame
+			else
+				local point, relativeTo, relativePoint = frame:GetPoint(1)
+
+				if point == "TOPLEFT" and relativeTo == healthBar and relativePoint == "TOPLEFT" then
+					return frame
+				end
+			end
+		end
+	end
+end
+
+---Points both spec APIs at one spec, the way TestClassPower.lua does.
+local function SetSpec(specId)
+	_G.C_SpecializationInfo.GetSpecialization = function()
+		return 1
+	end
+	_G.C_SpecializationInfo.GetSpecializationInfo = function()
+		return specId
+	end
+end
+
+local BREWMASTER = 268
+local WINDWALKER = 269
+
+---Current health sits below max so a bar ranged on max health reads differently from one
+---ranged on current health.
+local function LoginWithStagger(classToken, specId, stagger)
+	local context = harness.Load("MiniResourceDisplay", { class = classToken })
+	SetSpec(specId)
+
+	_G.UnitStagger = function()
+		return stagger
+	end
+	_G.UnitHealth = function()
+		return 80
+	end
+
+	harness.Login(context)
+
+	-- Saved variables carry over between tests, so an earlier test may have left it off.
+	_G.MiniResourceDisplayDB.ShowStagger = true
+	context.Addon:Reload()
+
+	return context
+end
+
+---@return number, number, number
+local function StaggerColor()
+	local r, g, b = FindStaggerBar():GetStatusBarColor()
+	return r, g, b
+end
+
+fw.describe("Stagger overlay", function()
+	fw.it("defaults to on for a fresh install", function()
+		_G.MiniResourceDisplayDB = nil
+
+		local context = harness.Load("MiniResourceDisplay", { class = "MONK" })
+		SetSpec(BREWMASTER)
+		harness.Login(context)
+
+		fw.eq(_G.MiniResourceDisplayDB.ShowStagger, true, "default")
+		fw.truthy(FindStaggerBar():IsShown(), "bar shown")
+	end)
+
+	fw.it("shows the staggered amount against current health for a Brewmaster", function()
+		LoginWithStagger("MONK", BREWMASTER, 40)
+
+		local bar = FindStaggerBar()
+		local _, max = bar:GetMinMaxValues()
+
+		fw.truthy(bar:IsShown(), "bar shown")
+		fw.eq(bar:GetValue(), 40, "stagger value")
+		fw.eq(max, 80, "ranged on current health, which is the width of the fill it covers")
+	end)
+
+	fw.it("builds nothing for another class, even with the Brewmaster spec id", function()
+		LoginWithStagger("WARRIOR", BREWMASTER, 40)
+
+		fw.is_nil(FindStaggerBar(), "no stagger bar")
+		fw.eq(WowMock.FireEvent("UNIT_AURA", "player"), 0, "no frame listens for UNIT_AURA")
+	end)
+
+	fw.it("listens for UNIT_AURA as a monk", function()
+		LoginWithStagger("MONK", BREWMASTER, 40)
+
+		fw.truthy(WowMock.FireEvent("UNIT_AURA", "player") > 0, "a frame listens for UNIT_AURA")
+	end)
+
+	fw.it("gives the pet bar no stagger bar", function()
+		LoginWithStagger("MONK", BREWMASTER, 40)
+
+		local petContainer = _G["MiniResourceDisplayPetFrame"]
+
+		fw.not_nil(petContainer, "pet container exists")
+		fw.is_nil(FindStaggerBar(petContainer), "no stagger bar on the pet")
+	end)
+
+	fw.it("stays hidden for a monk in another spec", function()
+		LoginWithStagger("MONK", WINDWALKER, 40)
+
+		local bar = FindStaggerBar()
+
+		fw.falsy(bar:IsShown(), "bar hidden")
+		fw.eq(bar:GetValue(), 0, "no stagger value pushed")
+	end)
+
+	fw.it("hides when the option is off and comes back without a reload", function()
+		local context = LoginWithStagger("MONK", BREWMASTER, 40)
+
+		_G.UnitStagger = function()
+			return 15
+		end
+		_G.MiniResourceDisplayDB.ShowStagger = false
+		context.Addon:Reload()
+
+		local bar = FindStaggerBar()
+
+		fw.falsy(bar:IsShown(), "bar hidden")
+		fw.eq(bar:GetValue(), 40, "the new stagger was not pushed")
+
+		_G.MiniResourceDisplayDB.ShowStagger = true
+		context.Addon:Reload()
+
+		fw.truthy(bar:IsShown(), "bar shown again")
+		fw.eq(bar:GetValue(), 15, "stagger value")
+	end)
+
+	fw.it("shows once the player changes into Brewmaster", function()
+		LoginWithStagger("MONK", WINDWALKER, 40)
+
+		SetSpec(BREWMASTER)
+		WowMock.FireEvent("PLAYER_SPECIALIZATION_CHANGED", "player")
+
+		fw.truthy(FindStaggerBar():IsShown(), "bar shown")
+	end)
+
+	fw.it("follows a stagger change that comes with no health change", function()
+		LoginWithStagger("MONK", BREWMASTER, 40)
+
+		_G.UnitStagger = function()
+			return 10
+		end
+		WowMock.FireEvent("UNIT_AURA", "player")
+
+		fw.eq(FindStaggerBar():GetValue(), 10, "purified stagger")
+	end)
+
+	fw.it("takes the default colour on a fresh install", function()
+		_G.MiniResourceDisplayDB = nil
+
+		local context = harness.Load("MiniResourceDisplay", { class = "MONK" })
+		SetSpec(BREWMASTER)
+		harness.Login(context)
+
+		local r, g, b = StaggerColor()
+
+		fw.eq(r, 1, "default red")
+		fw.eq(g, 0.98, "default green")
+		fw.eq(b, 0.72, "default blue")
+	end)
+
+	fw.it("takes a changed colour without a reload", function()
+		local context = LoginWithStagger("MONK", BREWMASTER, 40)
+
+		_G.MiniResourceDisplayDB.StaggerColor = { 0.1, 0.2, 0.3 }
+		context.Addon:Reload()
+
+		local r, g, b = StaggerColor()
+
+		fw.eq(r, 0.1, "configured red")
+		fw.eq(g, 0.2, "configured green")
+		fw.eq(b, 0.3, "configured blue")
+	end)
+
+	fw.it("passes a secret stagger straight to the bar", function()
+		LoginWithStagger("MONK", BREWMASTER, 10)
+
+		-- Minted after the load, which installs a fresh mock and forgets earlier secrets.
+		local secret = WowMock.MakeSecret(70)
+		local secretHealth = WowMock.MakeSecret(80)
+		_G.UnitStagger = function()
+			return secret
+		end
+		_G.UnitHealth = function()
+			return secretHealth
+		end
+
+		fw.no_error(function()
+			WowMock.FireEvent("UNIT_AURA", "player")
+		end, "secret stagger and health")
+
+		local bar = FindStaggerBar()
+		local _, max = bar:GetMinMaxValues()
+
+		fw.truthy(rawequal(bar:GetValue(), secret), "secret handed to SetValue")
+		fw.truthy(rawequal(max, secretHealth), "secret health handed to SetMinMaxValues")
 	end)
 end)

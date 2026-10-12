@@ -32,6 +32,8 @@ local SPEC_RUNE_COLOR_INDEX = {
 
 local RUNE_UPDATE_INTERVAL = 0.1
 
+local BREWMASTER_SPEC_ID = 268
+
 -- Enum.PowerType field names, as UNIT_POWER_UPDATE/FREQUENT's own powerToken argument spells them.
 local POWER_TOKEN_BY_FIELD = {
 	ComboPoints = "COMBO_POINTS",
@@ -217,6 +219,23 @@ local function GetRuneColor(runeType, specId)
 	end
 
 	return GetPowerColor()
+end
+
+---Whether this character can ever stagger. Class is fixed for the session, so this is checked
+---once at setup, and Forever defines UnitStagger with no monks.
+---@return boolean
+function addon:HasStagger()
+	return UnitStagger ~= nil and select(2, UnitClass("player")) == "MONK"
+end
+
+local function IsBrewmaster()
+	local _, classToken = UnitClass("player")
+
+	if classToken ~= "MONK" then
+		return false
+	end
+
+	return addon.ClassPower:CurrentSpecId() == BREWMASTER_SPEC_ID
 end
 
 -- A live client raises on an event name it doesn't know, so a name this addon added for a
@@ -535,6 +554,25 @@ local function CreateBarGroup(unit, containerName, hasPower, getPositionDb)
 				end
 			end
 		end
+
+		self:UpdateStagger()
+	end
+
+	function group:UpdateStagger()
+		if not self.staggerBar then
+			return
+		end
+
+		local shown = db.ShowStagger ~= false and IsBrewmaster()
+		self.staggerBar:SetShown(shown)
+
+		if not shown then
+			return
+		end
+
+		-- The bar spans only the health fill, so current health is its full range.
+		self.staggerBar:SetMinMaxValues(0, UnitHealth("player") or 0)
+		self.staggerBar:SetValue(UnitStagger("player") or 0)
 	end
 
 	function group:UpdatePower()
@@ -927,6 +965,16 @@ local function CreateBarGroup(unit, containerName, hasPower, getPositionDb)
 			)
 		end
 
+		if self.staggerBar then
+			local sc = db.StaggerColor
+			self.staggerBar:SetStatusBarColor(
+				(sc and sc[1]) or 1,
+				(sc and sc[2]) or 0.98,
+				(sc and sc[3]) or 0.72,
+				1
+			)
+		end
+
 		if self.powerBar then
 			local r, g, b = GetPowerColor()
 			SetBarColor(self.powerBar, r, g, b)
@@ -979,6 +1027,15 @@ local function CreateBarGroup(unit, containerName, hasPower, getPositionDb)
 			if ihTex then
 				ihTex:SetHorizTile(false)
 				ihTex:SetVertTile(false)
+			end
+		end
+
+		if texture and self.staggerBar then
+			self.staggerBar:SetStatusBarTexture(texture)
+			local staggerTex = self.staggerBar:GetStatusBarTexture()
+			if staggerTex then
+				staggerTex:SetHorizTile(false)
+				staggerTex:SetVertTile(false)
 			end
 		end
 
@@ -1119,6 +1176,11 @@ local function CreateBarGroup(unit, containerName, hasPower, getPositionDb)
 
 		self.overshieldBar:SetStatusBarColor(1, 1, 1, 1)
 
+		if self.unit == "player" and addon:HasStagger() then
+			self.staggerBar = CreateFrame("StatusBar", nil, self.container)
+			self.staggerBar:SetReverseFill(true)
+		end
+
 		if self.hasPower then
 			self.powerBar = CreateFrame("StatusBar", nil, self.container)
 			self.powerBar.Background = CreateBackground(self.powerBar)
@@ -1139,6 +1201,12 @@ local function CreateBarGroup(unit, containerName, hasPower, getPositionDb)
 			self.absorbZoneBgFrame:SetPoint("BOTTOMRIGHT", self.healthBar, "BOTTOMRIGHT", 0, 0)
 		end
 
+		-- Stagger is still to come off current health, so it fills back from the fill's right edge.
+		if self.staggerBar then
+			self.staggerBar:SetPoint("TOPLEFT", self.healthBar, "TOPLEFT", 0, 0)
+			self.staggerBar:SetPoint("BOTTOMRIGHT", self.healthBar:GetStatusBarTexture(), "BOTTOMRIGHT", 0, 0)
+		end
+
 		if CreateUnitHealPredictionCalculator then
 			self.healPredictionCalc = CreateUnitHealPredictionCalculator()
 			self.healPredictionCalc:SetDamageAbsorbClampMode(Enum.UnitDamageAbsorbClampMode.MissingHealth)
@@ -1152,10 +1220,12 @@ local function CreateBarGroup(unit, containerName, hasPower, getPositionDb)
 		if self.powerBar then self.powerBar:SetFrameLevel(baseLevel + 1) end
 		if self.powerBar and addon.PowerTick:IsSupported() then self:CreateTicker() end
 		self.incomingHealBar:SetFrameLevel(baseLevel + 1)
+		-- Stagger covers the health fill, and shields stay above it so an absorb is never hidden.
+		if self.staggerBar then self.staggerBar:SetFrameLevel(baseLevel + 2) end
 		if self.absorbZoneBgFrame then self.absorbZoneBgFrame:SetFrameLevel(baseLevel + 1) end
 		-- Shield bars above so they render on top of the incoming heal bar and absorb zone backing
-		self.overshieldBar:SetFrameLevel(baseLevel + 2)
-		self.regularAbsorbBar:SetFrameLevel(baseLevel + 2)
+		self.overshieldBar:SetFrameLevel(baseLevel + 3)
+		self.regularAbsorbBar:SetFrameLevel(baseLevel + 3)
 
 		if db.Border then
 			self.healthBar.Outline = AddBlackOutline(self.healthBar)
@@ -1166,7 +1236,7 @@ local function CreateBarGroup(unit, containerName, hasPower, getPositionDb)
 
 		-- Text frame above all bars so font strings aren't covered by regularAbsorbBar
 		local textFrame = CreateFrame("Frame", nil, self.container)
-		textFrame:SetFrameLevel(baseLevel + 3)
+		textFrame:SetFrameLevel(baseLevel + 4)
 
 		self.healthText = textFrame:CreateFontString(nil, "OVERLAY")
 		self.healthText:SetPoint("CENTER", self.healthBar, "CENTER", 0, 0)
@@ -1276,6 +1346,15 @@ local function OnEvent(_, event, arg1, arg2)
 			playerGroup:UpdateSizes()
 			playerGroup:UpdateVisibility()
 			playerGroup:UpdateClassPower()
+			playerGroup:UpdateStagger()
+		end
+		return
+	end
+
+	-- Purifying or a stagger tick changes the amount without always touching health.
+	if event == "UNIT_AURA" then
+		if arg1 == "player" then
+			playerGroup:UpdateStagger()
 		end
 		return
 	end
@@ -1356,6 +1435,15 @@ local function OnAddonLoaded()
 			end
 
 			RegisterEventGuarded(eventsFrame, "PLAYER_SPECIALIZATION_CHANGED")
+
+			if addon:HasStagger() then
+				if eventsFrame.RegisterUnitEvent then
+					eventsFrame:RegisterUnitEvent("UNIT_AURA", "player")
+				else
+					eventsFrame:RegisterEvent("UNIT_AURA")
+				end
+			end
+
 			RegisterEventGuarded(eventsFrame, "RUNE_POWER_UPDATE")
 			RegisterEventGuarded(eventsFrame, "RUNE_TYPE_UPDATE")
 

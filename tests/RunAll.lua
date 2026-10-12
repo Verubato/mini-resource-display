@@ -7,6 +7,10 @@
 
 package.path = "build/Lua/?.lua;tests/Helpers/?.lua;tests/?.lua;" .. package.path
 
+-- The shared mock does not define the Forever project constant. It has to exist before the mock
+-- loads, because installing a client clears every global that was not there at that point.
+_G.WOW_PROJECT_CAMELOT = 18
+
 io.write("MiniResourceDisplay - unit tests\n")
 io.write("======================================\n")
 

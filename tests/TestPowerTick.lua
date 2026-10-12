@@ -42,6 +42,12 @@ fw.describe("MiniResourceDisplay - client support", function()
 
 		fw.falsy(env.Tick:IsSupported(), "retail has no tick to point at")
 	end)
+
+	fw.it("stays hidden on Forever, where power is always a secret value", function()
+		_G.WOW_PROJECT_ID = _G.WOW_PROJECT_CAMELOT
+
+		fw.falsy(env.Tick:IsSupported(), "no readable power to find a tick in")
+	end)
 end)
 
 fw.describe("MiniResourceDisplay - the five second rule", function()

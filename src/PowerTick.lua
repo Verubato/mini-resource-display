@@ -35,6 +35,7 @@ local TICKING_POWER_TYPES = {
 -- flavour has to be added here or the ticker simply won't offer itself there.
 -- Named globals rather than their numeric values, and built with pairs so a constant the
 -- running client doesn't define is skipped instead of truncating the list.
+-- Forever is left out because its power is always a secret value, so no gain can be measured.
 local CLASSIC_PROJECT_IDS = {}
 
 for _, project in pairs({

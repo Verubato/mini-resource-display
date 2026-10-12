@@ -46,6 +46,20 @@ local POWER_TOKEN_BY_FIELD = {
 	ShadowOrbs = "SHADOW_ORBS",
 }
 
+-- How far below each anchor point the top edge sits, as a share of the frame's height.
+local POINT_TOP_OFFSET = {
+	TOPLEFT = 0, TOP = 0, TOPRIGHT = 0,
+	LEFT = 0.5, CENTER = 0.5, RIGHT = 0.5,
+	BOTTOMLEFT = 1, BOTTOM = 1, BOTTOMRIGHT = 1,
+}
+
+-- The point on the top edge in line with each anchor point.
+local TOP_POINT = {
+	TOPLEFT = "TOPLEFT", TOP = "TOP", TOPRIGHT = "TOPRIGHT",
+	LEFT = "TOPLEFT", CENTER = "TOP", RIGHT = "TOPRIGHT",
+	BOTTOMLEFT = "TOPLEFT", BOTTOM = "TOP", BOTTOMRIGHT = "TOPRIGHT",
+}
+
 ---Hoisted because an inline comparator is a fresh closure per sort, and this one can sort ten
 ---times a second.
 local function CompareRuneReadiness(a, b)
@@ -252,6 +266,40 @@ local function RegisterEventGuarded(frame, event)
 	pcall(frame.RegisterEvent, frame, event)
 end
 
+---Moves a saved position onto the frame's top edge without moving the frame, so a row
+---added or removed later grows the display downward.
+---@param pos table saved position, rewritten in place
+---@param height number the frame's current height
+local function AnchorPositionToTop(pos, height)
+	local point = pos.Point or "CENTER"
+	local topPoint = TOP_POINT[point]
+
+	if not topPoint or topPoint == point then
+		return
+	end
+
+	pos.Point = topPoint
+	pos.Y = (tonumber(pos.Y) or 0) + height * POINT_TOP_OFFSET[point]
+end
+
+---A percent needs arithmetic, which a secret forbids, so a secret amount or max health
+---shows the plain amount instead.
+local function FormatStaggerText(stagger, maxHealth)
+	if db.UsePercent and not mini:IsSecret(stagger) and not mini:IsSecret(maxHealth) then
+		local pct = 0
+
+		if maxHealth > 0 then
+			pct = math.floor((stagger / maxHealth) * 100 + 0.5)
+		end
+
+		local fmt = db.HideTextSuffix and "%d" or "%d%%"
+		return string.format(fmt, pct)
+	end
+
+	local amount = db.HideTextSuffix and stagger or AbbreviateNumbers(stagger)
+	return string.format("%s", amount)
+end
+
 -- Independent of ShowPower, so a player can hide the power bar and keep the pips.
 local function ResolveClassPower()
 	if not db.ClassPower.Enabled then
@@ -363,8 +411,16 @@ local function CreateBarGroup(unit, containerName, hasPower, getPositionDb)
 		end
 	end
 
-	function group:ApplyPosition()
+	---@param height number? the height to find the top edge with, the 2.9.0 one when omitted
+	function group:ApplyPosition(height)
 		local pos = getPositionDb()
+
+		height = height or self.legacyLayoutHeight
+
+		-- Waits for a known height, since that decides where the top edge sits.
+		if height then
+			AnchorPositionToTop(pos, height)
+		end
 
 		mini:ApplyPosition(self.container, pos)
 		mini:SetPositionLocked(self.container, pos.Locked)
@@ -382,6 +438,8 @@ local function CreateBarGroup(unit, containerName, hasPower, getPositionDb)
 
 		local showHealth = not self.hasPower or (db.ShowHealth ~= false)
 		local showPower = self.hasPower and (db.ShowPower ~= false)
+		local showStagger = self:IsStaggerShown()
+		local staggerHeight = db.StaggerHeight or 10
 		local showClassPower = self.hasPower and ResolveClassPower() ~= nil
 		local cpHeight = db.ClassPower.Height or 10
 
@@ -389,6 +447,7 @@ local function CreateBarGroup(unit, containerName, hasPower, getPositionDb)
 		local rowHeight = 0
 		if showHealth then rows = rows + 1; rowHeight = rowHeight + h end
 		if showPower then rows = rows + 1; rowHeight = rowHeight + h end
+		if showStagger then rows = rows + 1; rowHeight = rowHeight + staggerHeight end
 		if showClassPower then rows = rows + 1; rowHeight = rowHeight + cpHeight end
 
 		-- Event handlers call this after a fade-out, so showing the container here would undo the fade.
@@ -397,6 +456,17 @@ local function CreateBarGroup(unit, containerName, hasPower, getPositionDb)
 		if rows > 0 then
 			local totalHeight = rowHeight + ((rows - 1) * gap) + pad * 2
 			self.container:SetSize(w + pad * 2, totalHeight)
+			self.layoutHeight = totalHeight
+
+			-- 2.9.0 had no stagger row, so a position centred then has to convert without it.
+			local legacyRows = rows - (showStagger and 1 or 0)
+
+			if legacyRows > 0 then
+				local legacyRowHeight = rowHeight - (showStagger and staggerHeight or 0)
+				self.legacyLayoutHeight = legacyRowHeight + ((legacyRows - 1) * gap) + pad * 2
+			else
+				self.legacyLayoutHeight = totalHeight
+			end
 		end
 
 		self.healthBar:ClearAllPoints()
@@ -424,13 +494,33 @@ local function CreateBarGroup(unit, containerName, hasPower, getPositionDb)
 			end
 		end
 
+		if self.staggerBar then
+			self.staggerBar:ClearAllPoints()
+			self.staggerBar:SetHeight(staggerHeight)
+			self.staggerBar:SetShown(showStagger)
+
+			if showStagger then
+				local anchor = (showPower and self.powerBar) or (showHealth and self.healthBar)
+
+				if anchor then
+					self.staggerBar:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 0, -gap)
+					self.staggerBar:SetPoint("TOPRIGHT", anchor, "BOTTOMRIGHT", 0, -gap)
+				else
+					self.staggerBar:SetPoint("TOPLEFT", self.container, "TOPLEFT", pad, -pad)
+					self.staggerBar:SetPoint("TOPRIGHT", self.container, "TOPRIGHT", -pad, -pad)
+				end
+			end
+		end
+
 		if self.classPowerRow then
 			self.classPowerRow:ClearAllPoints()
 			self.classPowerRow:SetHeight(cpHeight)
 			self.classPowerRow:SetShown(showClassPower)
 
 			if showClassPower then
-				local anchor = (showPower and self.powerBar) or (showHealth and self.healthBar)
+				local anchor = (showStagger and self.staggerBar)
+					or (showPower and self.powerBar)
+					or (showHealth and self.healthBar)
 
 				if anchor then
 					self.classPowerRow:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 0, -gap)
@@ -445,9 +535,11 @@ local function CreateBarGroup(unit, containerName, hasPower, getPositionDb)
 		if db.ShowText then
 			self.healthText:SetShown(showHealth)
 			if self.powerText then self.powerText:SetShown(showPower) end
+			if self.staggerText then self.staggerText:SetShown(showStagger) end
 		else
 			self.healthText:Hide()
 			if self.powerText then self.powerText:Hide() end
+			if self.staggerText then self.staggerText:Hide() end
 		end
 
 		if db.FontShadow then
@@ -458,9 +550,15 @@ local function CreateBarGroup(unit, containerName, hasPower, getPositionDb)
 				self.powerText:SetShadowOffset(1, -1)
 				self.powerText:SetShadowColor(0, 0, 0, 1)
 			end
+
+			if self.staggerText then
+				self.staggerText:SetShadowOffset(1, -1)
+				self.staggerText:SetShadowColor(0, 0, 0, 1)
+			end
 		else
 			self.healthText:SetShadowOffset(0, 0)
 			if self.powerText then self.powerText:SetShadowOffset(0, 0) end
+			if self.staggerText then self.staggerText:SetShadowOffset(0, 0) end
 		end
 
 		self:UpdateTickerVisibility()
@@ -558,21 +656,35 @@ local function CreateBarGroup(unit, containerName, hasPower, getPositionDb)
 		self:UpdateStagger()
 	end
 
+	function group:IsStaggerShown()
+		return self.staggerBar ~= nil and db.ShowStagger ~= false and IsBrewmaster()
+	end
+
 	function group:UpdateStagger()
 		if not self.staggerBar then
 			return
 		end
 
-		local shown = db.ShowStagger ~= false and IsBrewmaster()
-		self.staggerBar:SetShown(shown)
+		local shown = self:IsStaggerShown()
+
+		if shown ~= self.staggerBar:IsShown() then
+			self:UpdateSizes()
+			self:UpdateVisibility()
+		end
 
 		if not shown then
 			return
 		end
 
-		-- The bar spans only the health fill, so current health is its full range.
-		self.staggerBar:SetMinMaxValues(0, UnitHealth("player") or 0)
-		self.staggerBar:SetValue(UnitStagger("player") or 0)
+		local stagger = UnitStagger("player") or 0
+		local maxHealth = UnitHealthMax("player") or 0
+
+		self.staggerBar:SetMinMaxValues(0, maxHealth)
+		self.staggerBar:SetValue(stagger, smoothing)
+
+		if db.ShowText and self.staggerText then
+			self.staggerText:SetText(FormatStaggerText(stagger, maxHealth))
+		end
 	end
 
 	function group:UpdatePower()
@@ -967,12 +1079,7 @@ local function CreateBarGroup(unit, containerName, hasPower, getPositionDb)
 
 		if self.staggerBar then
 			local sc = db.StaggerColor
-			self.staggerBar:SetStatusBarColor(
-				(sc and sc[1]) or 1,
-				(sc and sc[2]) or 0.98,
-				(sc and sc[3]) or 0.72,
-				1
-			)
+			SetBarColor(self.staggerBar, (sc and sc[1]) or 1, (sc and sc[2]) or 0.98, (sc and sc[3]) or 0.72)
 		end
 
 		if self.powerBar then
@@ -1030,12 +1137,22 @@ local function CreateBarGroup(unit, containerName, hasPower, getPositionDb)
 			end
 		end
 
-		if texture and self.staggerBar then
+		if self.staggerBar then
 			self.staggerBar:SetStatusBarTexture(texture)
-			local staggerTex = self.staggerBar:GetStatusBarTexture()
-			if staggerTex then
-				staggerTex:SetHorizTile(false)
-				staggerTex:SetVertTile(false)
+			local staggerTexture = self.staggerBar:GetStatusBarTexture()
+
+			if staggerTexture == nil then
+				self.staggerBar:SetStatusBarTexture(fallbackTexture)
+				staggerTexture = self.staggerBar:GetStatusBarTexture()
+			end
+
+			if staggerTexture then
+				staggerTexture:SetHorizTile(false)
+				staggerTexture:SetVertTile(false)
+			end
+
+			if texture and self.staggerBar.Background then
+				self.staggerBar.Background:SetTexture(texture)
 			end
 		end
 
@@ -1080,6 +1197,10 @@ local function CreateBarGroup(unit, containerName, hasPower, getPositionDb)
 		if self.powerText then
 			self.powerText:SetFont(db.Font or "Fonts\\FRIZQT__.TTF", db.FontSize or 11, db.FontFlags or "OUTLINE")
 		end
+
+		if self.staggerText then
+			self.staggerText:SetFont(db.Font or "Fonts\\FRIZQT__.TTF", db.FontSize or 11, db.FontFlags or "OUTLINE")
+		end
 	end
 
 	function group:UpdateVisibility()
@@ -1115,6 +1236,10 @@ local function CreateBarGroup(unit, containerName, hasPower, getPositionDb)
 		mini:MakeMovable(self.container, getPositionDb(), {
 			IsLocked = function()
 				return getPositionDb().Locked and true or false
+			end,
+			-- The client picks its own anchor point on drop, so this puts it back on the top edge.
+			OnMoved = function()
+				self:ApplyPosition(self.layoutHeight)
 			end,
 		})
 
@@ -1178,7 +1303,7 @@ local function CreateBarGroup(unit, containerName, hasPower, getPositionDb)
 
 		if self.unit == "player" and addon:HasStagger() then
 			self.staggerBar = CreateFrame("StatusBar", nil, self.container)
-			self.staggerBar:SetReverseFill(true)
+			self.staggerBar.Background = CreateBackground(self.staggerBar)
 		end
 
 		if self.hasPower then
@@ -1201,12 +1326,6 @@ local function CreateBarGroup(unit, containerName, hasPower, getPositionDb)
 			self.absorbZoneBgFrame:SetPoint("BOTTOMRIGHT", self.healthBar, "BOTTOMRIGHT", 0, 0)
 		end
 
-		-- Stagger is still to come off current health, so it fills back from the fill's right edge.
-		if self.staggerBar then
-			self.staggerBar:SetPoint("TOPLEFT", self.healthBar, "TOPLEFT", 0, 0)
-			self.staggerBar:SetPoint("BOTTOMRIGHT", self.healthBar:GetStatusBarTexture(), "BOTTOMRIGHT", 0, 0)
-		end
-
 		if CreateUnitHealPredictionCalculator then
 			self.healPredictionCalc = CreateUnitHealPredictionCalculator()
 			self.healPredictionCalc:SetDamageAbsorbClampMode(Enum.UnitDamageAbsorbClampMode.MissingHealth)
@@ -1218,10 +1337,9 @@ local function CreateBarGroup(unit, containerName, hasPower, getPositionDb)
 		local baseLevel = self.container:GetFrameLevel() or 0
 		self.healthBar:SetFrameLevel(baseLevel + 1)
 		if self.powerBar then self.powerBar:SetFrameLevel(baseLevel + 1) end
+		if self.staggerBar then self.staggerBar:SetFrameLevel(baseLevel + 1) end
 		if self.powerBar and addon.PowerTick:IsSupported() then self:CreateTicker() end
 		self.incomingHealBar:SetFrameLevel(baseLevel + 1)
-		-- Stagger covers the health fill, and shields stay above it so an absorb is never hidden.
-		if self.staggerBar then self.staggerBar:SetFrameLevel(baseLevel + 2) end
 		if self.absorbZoneBgFrame then self.absorbZoneBgFrame:SetFrameLevel(baseLevel + 1) end
 		-- Shield bars above so they render on top of the incoming heal bar and absorb zone backing
 		self.overshieldBar:SetFrameLevel(baseLevel + 3)
@@ -1231,6 +1349,9 @@ local function CreateBarGroup(unit, containerName, hasPower, getPositionDb)
 			self.healthBar.Outline = AddBlackOutline(self.healthBar)
 			if self.powerBar then
 				self.powerBar.Outline = AddBlackOutline(self.powerBar)
+			end
+			if self.staggerBar then
+				self.staggerBar.Outline = AddBlackOutline(self.staggerBar)
 			end
 		end
 
@@ -1246,6 +1367,11 @@ local function CreateBarGroup(unit, containerName, hasPower, getPositionDb)
 			self.powerText:SetPoint("CENTER", self.powerBar, "CENTER", 0, 0)
 		end
 
+		if self.staggerBar then
+			self.staggerText = textFrame:CreateFontString(nil, "OVERLAY")
+			self.staggerText:SetPoint("CENTER", self.staggerBar, "CENTER", 0, 0)
+		end
+
 		self:UpdateFonts()
 	end
 
@@ -1254,8 +1380,9 @@ local function CreateBarGroup(unit, containerName, hasPower, getPositionDb)
 		-- the box count, so the cache that skips re-layout on an unchanged count can't be trusted here.
 		self.classPowerLayoutN = nil
 
-		self:ApplyPosition()
+		-- Sized first so the position knows the height it needs to find the top edge.
 		self:UpdateSizes()
+		self:ApplyPosition()
 		self:UpdateColors()
 		self:UpdateVisibility()
 		self:UpdateHealth()

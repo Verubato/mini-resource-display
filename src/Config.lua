@@ -10,11 +10,12 @@ local SWATCH_WIDTH = 72
 local db
 ---@class Db
 local dbDefaults = {
-	Point = "CENTER",
+	-- Where a never-moved 2.9.0 display converts to, so it does not move.
+	Point = "TOP",
 	RelativeTo = "UIParent",
 	RelativePoint = "CENTER",
 	X = 0,
-	Y = -140,
+	Y = -123,
 
 	Locked = false,
 
@@ -70,6 +71,7 @@ local dbDefaults = {
 
 	ShowStagger = true,
 	StaggerColor = { 1, 0.98, 0.72 },
+	StaggerHeight = 10,
 
 	-- Classic-only; ignored and never shown in the options on retail, where power regen
 	-- is continuous rather than ticked.
@@ -84,12 +86,13 @@ local dbDefaults = {
 		Thickness = 2,
 	},
 
+	-- Where a never-moved 2.9.0 pet bar converts to, so it does not move.
 	Pet = {
-		Point = "CENTER",
+		Point = "TOP",
 		RelativeTo = "UIParent",
 		RelativePoint = "CENTER",
 		X = 0,
-		Y = -165,
+		Y = -155.5,
 		Locked = false,
 	},
 
@@ -617,7 +620,7 @@ function M:Init()
 		local staggerHeader = mini:PanelHeader({
 			Parent = staggerPanel,
 			Title = "Stagger",
-			Description = "Shows a Brewmaster's staggered damage on the health bar.",
+			Description = "Shows a Brewmaster's staggered damage as its own bar under the power bar.",
 			Gap = 6,
 			Divider = "Settings",
 		})
@@ -625,7 +628,7 @@ function M:Init()
 		local staggerEnabledChk = mini:Checkbox({
 			Parent = staggerPanel,
 			LabelText = "Show stagger",
-			Tooltip = "Whether to show the damage still to come from stagger at the end of the health bar.",
+			Tooltip = "Whether to show a bar for the damage still to come from stagger, measured against your maximum health.",
 			GetValue = function()
 				return db.ShowStagger
 			end,
@@ -674,6 +677,33 @@ function M:Init()
 		local staggerSwatchHint = staggerPanel:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
 		staggerSwatchHint:SetPoint("LEFT", staggerSwatch, "RIGHT", 8, 0)
 		staggerSwatchHint:SetText("Click to change colour")
+
+		local staggerSizeDivider = mini:Divider({
+			Parent = staggerPanel,
+			Text = "Size",
+		})
+
+		staggerSizeDivider:SetPoint("TOP", staggerSwatch, "BOTTOM", 0, -verticalSpacing)
+		staggerSizeDivider:SetPoint("LEFT", staggerPanel, "LEFT")
+		staggerSizeDivider:SetPoint("RIGHT", staggerPanel, "RIGHT", -horizontalSpacing, 0)
+
+		local staggerHeightSlider = mini:Slider({
+			Parent = staggerPanel,
+			Min = 8,
+			Max = 50,
+			Step = 1,
+			Width = sliderWidth,
+			LabelText = "Height",
+			GetValue = function()
+				return db.StaggerHeight
+			end,
+			SetValue = function(value)
+				db.StaggerHeight = mini:ClampInt(value, 8, 50, dbDefaults.StaggerHeight)
+				addon:Reload()
+			end,
+		})
+
+		staggerHeightSlider.Slider:SetPoint("TOPLEFT", staggerSizeDivider, "BOTTOMLEFT", 0, -verticalSpacing * 3)
 
 		staggerPanel:HookScript("OnShow", function()
 			staggerSwatch:MiniRefresh()

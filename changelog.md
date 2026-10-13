@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.10.1
+
+Updated for patch 12.1.5.
+
 ## 2.10.0
 
 - Stagger is now its own bar under the power bar, like Blizzard's, with text and a height option.
